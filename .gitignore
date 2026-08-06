@@ -1,0 +1,111 @@
+# =========================
+
+# Node.js / React / Vite
+
+# =========================
+
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+
+# Logs
+
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment variables
+
+.env
+.env.*
+!.env.example
+
+# OS files
+
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+
+# Python / FastAPI
+
+# =========================
+
+**pycache**/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+.venv/
+venv/
+env/
+
+# Jupyter
+
+.ipynb_checkpoints/
+
+# =========================
+
+# React Native / Expo
+
+# =========================
+
+.expo/
+.expo-shared/
+node_modules/
+android/
+ios/
+*.keystore
+
+# =========================
+
+# Appwrite / Backend
+
+# =========================
+
+appwrite.json
+*.backup
+
+# =========================
+
+# AI / ML Models
+
+# =========================
+
+*.pt
+*.pth
+*.onnx
+models/
+weights/
+
+# =========================
+
+# Build & Coverage
+
+# =========================
+
+coverage/
+.nyc_output/
+
+# =========================
+
+# Misc
+
+# =========================
+
+*.zip
+*.tar
+*.gz
+*.rar
