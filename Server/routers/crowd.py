@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 from shared_data import latest_metrics
 from models import Metrics
+from db import insert_crowd_data
 
 router = APIRouter(prefix="/api/crowd", tags=["Crowd"])
 
@@ -13,6 +14,7 @@ def get_metrics():
 @router.post("/metrics")
 def update_metrics(metrics: Metrics):
     latest_metrics.update(metrics.model_dump())
+    insert_crowd_data(metrics.model_dump())
     return {
         "message": "Metrics Updated",
         "data": latest_metrics

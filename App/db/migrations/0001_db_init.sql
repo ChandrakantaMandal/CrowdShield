@@ -67,6 +67,10 @@ create table public.crowd_data (
 
     direction text,
 
+    surge_detected boolean not null default false,
+
+    bottleneck boolean not null default false,
+
     timestamp timestamptz default now()
 );
 
@@ -282,6 +286,11 @@ on crowd_data
 for select
 using (true);
 
+create policy "Anyone can insert crowd data"
+on crowd_data
+for insert
+with check (true);
+
 -- ==========================================
 -- RISK EVENTS
 -- ==========================================
@@ -290,6 +299,11 @@ create policy "Anyone can read risk events"
 on risk_events
 for select
 using (true);
+
+create policy "Anyone can insert risk events"
+on risk_events
+for insert
+with check (true);
 
 -- ==========================================
 -- INCIDENTS
