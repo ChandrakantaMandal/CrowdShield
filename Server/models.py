@@ -1,9 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
 
 class Metrics(BaseModel):
-    camera_id: str
-    people_count: int
-    density: float
-    average_speed: float
+    camera_id: str = Field(..., min_length=1)
+    people_count: int = Field(..., ge=0)
+    density: float = Field(..., ge=0)
+    average_speed: float = Field(..., ge=0)
     surge_detected: bool
     bottleneck: bool
