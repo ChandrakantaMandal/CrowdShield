@@ -77,7 +77,7 @@ export const EMERGENCY_EXIT = {
 export const MAIN_ENTRY = {
   id: 'MAIN_ENTRY',
   name: 'MAIN ENTRANCE GATE',
-  location: [0, 0, 31],
+  location: [0, 0, 32],
   width: 12,
   color: '#06b6d4'
 };
