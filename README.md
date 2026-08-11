@@ -30,46 +30,100 @@ CrowdShield continuously monitors crowd density, movement speed, surges, and bot
 ## 🏗️ Architecture
 
 ```mermaid
-graph TD
-    subgraph Sources
-        SIM[Simulation / TelemetrySync.js<br/>React Three Fiber 3D]
-        CAM[Real Cameras - YOLO + OpenCV]
-    end
+flowchart TD
 
-    subgraph Backend
-        API[FastAPI Server<br/>:8000]
-        RE[Risk Engine]
-        REC[Recommendation Engine]
-    end
+subgraph group_simulation["Telemetry sources"]
+  node_sim_app["Digital-twin simulator<br/>React simulation<br/>[App.jsx]"]
+  node_crowd_engine["Crowd engine<br/>simulation engine<br/>[CrowdEngine.js]"]
+  node_telemetry_sync["Telemetry sync<br/>API producer<br/>[TelemetrySync.js]"]
+  node_cv_pipeline["Camera CV prototype<br/>planned producer<br/>[detect.py]"]
+end
 
-    subgraph Data
-        SUP[(Supabase<br/>Auth + Postgres + RLS)]
-        MEM[(In-memory<br/>latest_metrics)]
-    end
+subgraph group_backend["FastAPI service"]
+  node_api["FastAPI entrypoint<br/>Python API<br/>[main.py]"]
+  node_crowd_router["Crowd ingestion<br/>crowd router<br/>[crowd.py]"]
+  node_live_store["Latest metrics store<br/>process-local state<br/>[shared_data.py]"]
+  node_risk_router["Risk API<br/>risk router<br/>[risk.py]"]
+  node_risk_engine["Risk engine<br/>decision engine<br/>[risk_engine.py]"]
+  node_recommendations["Recommendation engine<br/>decision engine"]
+  node_db_adapter["Persistence adapter<br/>database adapter<br/>[db.py]"]
+end
 
-    subgraph Clients
-        WEB[Admin Dashboard<br/>React + Vite :5173]
-        APP[Citizen App<br/>Expo / React Native]
-    end
+subgraph group_data["Data and identity"]
+  node_supabase[("Supabase<br/>Postgres, auth, RLS")]
+  node_schema["Domain schema<br/>SQL migrations<br/>[0001_db_init.sql]"]
+end
 
-    SIM -->|POST /api/crowd/metrics| API
-    CAM -->|POST /api/crowd/metrics| API
-    API --> MEM
-    API -->|insert_crowd_data| SUP
-    API --> RE
-    API --> REC
-    RE -->|insert_risk_event| SUP
-    API -->|GET /api/crowd/metrics| WEB
-    API -->|GET /api/risk/events| WEB
-    API -->|GET /api/crowd/history| WEB
-    SUP -->|auth + alerts + incidents| APP
-    SUP -->|auth + venues| WEB
-    WEB -->|POST /api/risk/calculate| API
+subgraph group_clients["Operator and citizen clients"]
+  node_web_app["Operator web console<br/>Vite React app<br/>[main.jsx]"]
+  node_web_routes["Web routes and auth<br/>route composition<br/>[AppRoutes.jsx]"]
+  node_web_live_data["Web live polling<br/>API client hook<br/>[useLiveData.js]"]
+  node_mobile_app["Citizen mobile app<br/>Expo Router app<br/>[_layout.tsx]"]
+  node_mobile_api["Mobile live-risk client<br/>API client<br/>[api.ts]"]
+  node_notifications["Risk notifications<br/>notification provider"]
+end
+
+node_expo_notifications{{"Expo notification services<br/>external service"}}
+
+node_sim_app -->|"runs"| node_crowd_engine
+node_crowd_engine -->|"zone state"| node_telemetry_sync
+node_telemetry_sync -->|"POST metrics"| node_crowd_router
+node_cv_pipeline -.->|"planned metrics source"| node_crowd_router
+node_api -->|"mounts"| node_crowd_router
+node_api -->|"mounts"| node_risk_router
+node_crowd_router -->|"updates"| node_live_store
+node_crowd_router -->|"persists metrics"| node_db_adapter
+node_crowd_router -->|"scores metrics"| node_risk_engine
+node_risk_engine -->|"creates risk events"| node_db_adapter
+node_risk_router -->|"calculates and reads events"| node_risk_engine
+node_risk_router -->|"generates"| node_recommendations
+node_db_adapter -->|"durable persistence"| node_supabase
+node_schema -->|"defines tables"| node_supabase
+node_web_app -->|"composes"| node_web_routes
+node_web_routes -->|"auth and roles"| node_supabase
+node_web_app -->|"uses"| node_web_live_data
+node_web_live_data -->|"polls telemetry and events"| node_api
+node_mobile_app -->|"auth and domain data"| node_supabase
+node_mobile_app -->|"uses"| node_mobile_api
+node_mobile_api -->|"polls live risk"| node_api
+node_mobile_app -->|"provides alerts"| node_notifications
+node_notifications -->|"delivers notifications"| node_expo_notifications
+
+click node_sim_app "https://github.com/chandrakantamandal/crowdshield/blob/main/Simulation/src/App.jsx"
+click node_crowd_engine "https://github.com/chandrakantamandal/crowdshield/blob/main/Simulation/src/engine/CrowdEngine.js"
+click node_telemetry_sync "https://github.com/chandrakantamandal/crowdshield/blob/main/Simulation/src/engine/TelemetrySync.js"
+click node_cv_pipeline "https://github.com/chandrakantamandal/crowdshield/blob/main/Ai/detect.py"
+click node_api "https://github.com/chandrakantamandal/crowdshield/blob/main/Server/main.py"
+click node_crowd_router "https://github.com/chandrakantamandal/crowdshield/blob/main/Server/routers/crowd.py"
+click node_live_store "https://github.com/chandrakantamandal/crowdshield/blob/main/Server/shared_data.py"
+click node_risk_router "https://github.com/chandrakantamandal/crowdshield/blob/main/Server/routers/risk.py"
+click node_risk_engine "https://github.com/chandrakantamandal/crowdshield/blob/main/Server/services/risk_engine.py"
+click node_recommendations "https://github.com/chandrakantamandal/crowdshield/blob/main/Server/services/recommendation_engine.py"
+click node_db_adapter "https://github.com/chandrakantamandal/crowdshield/blob/main/Server/db.py"
+click node_schema "https://github.com/chandrakantamandal/crowdshield/blob/main/App/db/migrations/0001_db_init.sql"
+click node_web_app "https://github.com/chandrakantamandal/crowdshield/blob/main/Web/src/main.jsx"
+click node_web_routes "https://github.com/chandrakantamandal/crowdshield/blob/main/Web/src/router/AppRoutes.jsx"
+click node_web_live_data "https://github.com/chandrakantamandal/crowdshield/blob/main/Web/src/lib/useLiveData.js"
+click node_mobile_app "https://github.com/chandrakantamandal/crowdshield/blob/main/App/app/_layout.tsx"
+click node_mobile_api "https://github.com/chandrakantamandal/crowdshield/blob/main/App/lib/api.ts"
+click node_notifications "https://github.com/chandrakantamandal/crowdshield/blob/main/App/components/RiskNotificationProvider.tsx"
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_sim_app,node_crowd_engine,node_telemetry_sync,node_cv_pipeline toneBlue
+class node_api,node_crowd_router,node_live_store,node_risk_router,node_risk_engine,node_recommendations,node_db_adapter toneAmber
+class node_supabase,node_schema toneMint
+class node_web_app,node_web_routes,node_web_live_data,node_mobile_app,node_mobile_api,node_notifications toneRose
+class node_expo_notifications toneNeutral
+
+
 ```
-
 ### Data Flow (end-to-end)
-
-```
 Simulation tick (1/s) → per-zone metrics → POST /api/crowd/metrics (5 zones)
         → FastAPI validates (Pydantic) → upsert in-memory latest_metrics
         → insert into Supabase crowd_data (if migrations applied)
