@@ -21,6 +21,10 @@ def calculate_risk(metrics):
         score += 10
         reasons.append("Bottleneck Detected")
 
+    if metrics.get("flow_conflict"):
+        score += 10
+        reasons.append("Flow Conflict Detected")
+
     if score <= 30:
         level = "SAFE"
     elif score <= 60:

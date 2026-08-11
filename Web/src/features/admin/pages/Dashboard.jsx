@@ -2,6 +2,7 @@
 import StatsCards from "../components/StatsCards";
 import CrowdMap from "../components/CrowdMap";
 import CameraFeed from "../components/CameraFeed";
+import TelemetryPanel from "../components/TelemetryPanel";
 import Alerts from "../components/Alerts";
 
 export default function Dashboard() {
@@ -15,10 +16,20 @@ export default function Dashboard() {
           <CrowdMap />
         </div>
 
-        {/* Right Panel */}
-        <div className="col-span-12 lg:col-span-4 space-y-6">
+        {/* Camera Feed */}
+        <div className="col-span-12 lg:col-span-4">
           <CameraFeed />
+        </div>
+      </div>
+
+      {/* Alerts + Telemetry (below the map) */}
+      <div className="grid grid-cols-12 gap-6 mt-6">
+        <div className="col-span-12 lg:col-span-6">
           <Alerts />
+        </div>
+
+        <div className="col-span-12 lg:col-span-6">
+          <TelemetryPanel />
         </div>
       </div>
     </div>

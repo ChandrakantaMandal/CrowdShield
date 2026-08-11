@@ -45,7 +45,7 @@ def insert_risk_event(risk: dict) -> dict:
     reason_text = ", ".join(reasons) if isinstance(reasons, list) else str(reasons)
 
     row = {
-        "zone_id": "ZONE_1",
+        "zone_id": risk.get("zone_id", "ZONE_1"),
         "risk_score": risk.get("risk_score", 0),
         "risk_level": risk.get("risk_level", "SAFE"),
         "reason": reason_text,
@@ -56,3 +56,61 @@ def insert_risk_event(risk: dict) -> dict:
         return {"status": "saved", "data": response.data}
     except Exception as e:
         return {"status": "error", "error": str(e)}
+
+
+def fetch_crowd_history(limit: int = 50, zone_id: str | None = None) -> dict:
+    if supabase is None:
+        return {"error": "Supabase not connected", "data": []}
+
+    try:
+        query = supabase.table("crowd_data").select("*").order("timestamp", desc=True).limit(limit)
+        if zone_id:
+            query = query.eq("zone_id", zone_id)
+        response = query.execute()
+        rows = response.data or []
+        for row in rows:
+            if "created_at" not in row and "timestamp" in row:
+                row["created_at"] = row["timestamp"]
+        return {"status": "ok", "data": rows}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "data": []}
+
+
+def fetch_zone_metrics() -> dict:
+    """Return the latest metrics row per zone_id from crowd_data."""
+    if supabase is None:
+        return {"error": "Supabase not connected", "data": []}
+
+    try:
+        query = supabase.table("crowd_data").select("*").order("timestamp", desc=True)
+        response = query.execute()
+        rows = response.data or []
+
+        latest_by_zone: dict[str, dict] = {}
+        for row in rows:
+            if "created_at" not in row and "timestamp" in row:
+                row["created_at"] = row["timestamp"]
+            zone = row.get("zone_id")
+            if zone and zone not in latest_by_zone:
+                latest_by_zone[zone] = row
+
+        return {"status": "ok", "data": list(latest_by_zone.values())}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "data": []}
+
+
+def fetch_risk_events(limit: int = 50) -> dict:
+    if supabase is None:
+        return {"error": "Supabase not connected", "data": []}
+
+    try:
+        response = (
+            supabase.table("risk_events")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return {"status": "ok", "data": response.data or []}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "data": []}

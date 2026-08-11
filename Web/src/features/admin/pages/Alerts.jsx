@@ -6,38 +6,35 @@ import {
   Siren,
 } from "lucide-react";
 
-const alerts = [
-  {
-    id: 1,
-    zone: "Stage Area",
-    level: "Critical",
-    message: "Crowd density exceeded safe threshold.",
-    time: "10:42 AM",
-  },
-  {
-    id: 2,
-    zone: "Main Hall",
-    level: "Warning",
-    message: "High pedestrian movement detected.",
-    time: "10:31 AM",
-  },
-  {
-    id: 3,
-    zone: "North Gate",
-    level: "Safe",
-    message: "Crowd flow is normal.",
-    time: "10:20 AM",
-  },
-  {
-    id: 4,
-    zone: "Food Court",
-    level: "Warning",
-    message: "Queue length increasing rapidly.",
-    time: "10:15 AM",
-  },
-];
+import useLiveData from "../../../lib/useLiveData";
+import { fetchRiskEvents, formatTime } from "../../../lib/api";
 
 export default function Alerts() {
+  const { data: events } = useLiveData(() => fetchRiskEvents(50), 2000);
+
+  const alerts = (events || []).map((event, index) => {
+    const level = event.risk_level || "SAFE";
+
+    return {
+      id: event.id || event.created_at || index,
+      zone: event.zone_id || "Unknown Zone",
+      level:
+        level === "CRITICAL"
+          ? "Critical"
+          : level === "HIGH"
+          ? "High"
+          : level === "WARNING"
+          ? "Warning"
+          : "Safe",
+      message: event.reason || "No details provided.",
+      time: event.created_at ? formatTime(event.created_at) : "—",
+    };
+  });
+
+  const critical = alerts.filter((a) => a.level === "Critical").length;
+  const warnings = alerts.filter((a) => a.level === "Warning" || a.level === "High").length;
+  const safe = alerts.filter((a) => a.level === "Safe").length;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -65,7 +62,7 @@ export default function Alerts() {
           <p className="text-slate-500 dark:text-slate-400">Critical Alerts</p>
 
           <h2 className="text-4xl font-bold text-red-600 dark:text-red-400 mt-2">
-            01
+            {String(critical).padStart(2, "0")}
           </h2>
         </div>
 
@@ -73,7 +70,7 @@ export default function Alerts() {
           <p className="text-slate-500 dark:text-slate-400">Warnings</p>
 
           <h2 className="text-4xl font-bold text-yellow-600 dark:text-yellow-400 mt-2">
-            02
+            {String(warnings).padStart(2, "0")}
           </h2>
         </div>
 
@@ -81,7 +78,7 @@ export default function Alerts() {
           <p className="text-slate-500 dark:text-slate-400">Safe Zones</p>
 
           <h2 className="text-4xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
-            12
+            {String(safe).padStart(2, "0")}
           </h2>
         </div>
       </div>
@@ -114,6 +111,8 @@ export default function Alerts() {
                   ${
                     alert.level === "Critical"
                       ? "bg-red-500/15"
+                      : alert.level === "High"
+                      ? "bg-orange-500/15"
                       : alert.level === "Warning"
                       ? "bg-yellow-500/15"
                       : "bg-emerald-500/15"
@@ -121,11 +120,13 @@ export default function Alerts() {
                 >
                   <TriangleAlert
                     className={
-                      alert.level === "Critical"
-                        ? "text-red-600 dark:text-red-400"
-                        : alert.level === "Warning"
-                        ? "text-yellow-600 dark:text-yellow-400"
-                        : "text-emerald-600 dark:text-emerald-400"
+                    alert.level === "Critical"
+                      ? "text-red-600 dark:text-red-400"
+                      : alert.level === "High"
+                      ? "text-orange-600 dark:text-orange-400"
+                      : alert.level === "Warning"
+                      ? "text-yellow-600 dark:text-yellow-400"
+                      : "text-emerald-600 dark:text-emerald-400"
                     }
                   />
                 </div>
@@ -161,6 +162,8 @@ export default function Alerts() {
                   ${
                     alert.level === "Critical"
                       ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                      : alert.level === "High"
+                      ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
                       : alert.level === "Warning"
                       ? "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400"
                       : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"

@@ -1,8 +1,5 @@
-latest_metrics = {
-    "camera_id": "CAM_01",
-    "people_count": 0,
-    "density": 0.0,
-    "average_speed": 0.0,
-    "surge_detected": False,
-    "bottleneck": False,
-}
+latest_metrics = {}
+
+# Tracks the last inserted risk level per zone so telemetry only writes a
+# risk_event when a zone transitions between levels (avoids flooding the table).
+last_risk_level = {}

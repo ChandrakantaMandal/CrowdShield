@@ -2,9 +2,14 @@ from fastapi import APIRouter
 from models import Metrics
 from services.risk_engine import calculate_risk
 from services.recommendation_engine import get_recommendation
-from db import insert_risk_event
+from db import insert_risk_event, fetch_risk_events
 
 router = APIRouter(prefix="/api", tags=["Risk"])
+
+@router.get("/risk/events")
+def risk_events(limit: int = 50):
+    return fetch_risk_events(limit=limit)
+
 
 @router.post("/risk/calculate")
 def risk(metrics: Metrics):
