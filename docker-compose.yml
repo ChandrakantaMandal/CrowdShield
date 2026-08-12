@@ -1,0 +1,37 @@
+services:
+  server:
+    build:
+      context: ./Server
+    container_name: crowdshield-server
+    env_file:
+      - ./Server/.env
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/status')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: ./Web
+    container_name: crowdshield-web
+    env_file:
+    - ./Web/.env
+    ports:
+      - "5173:5173"
+    depends_on:
+      server:
+        condition: service_healthy
+
+  simulation:
+    build:
+      context: ./Simulation
+    container_name: crowdshield-simulation
+    ports:
+      - "3000:3000"
+    depends_on:
+      server:
+        condition: service_healthy
