@@ -10,11 +10,6 @@ from routers.gate import router as gate_router
 from routers.db import router as db_router
 
 
-app = FastAPI(title="CrowdShield API")
-app.include_router(alerts_router)
-app.include_router(safe_gate_router)
-app.include_router(gate_router)
-app.include_router(db_router)
 from shared_data import latest_metrics, last_risk_level
 from db import (
     insert_crowd_data,
@@ -25,6 +20,10 @@ from db import (
 )
 
 app = FastAPI(title="CrowdShield API")
+app.include_router(alerts_router)
+app.include_router(safe_gate_router)
+app.include_router(gate_router)
+app.include_router(db_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -87,6 +86,11 @@ def crowd_history(limit: int = 50, zone_id: str | None = None):
 @app.get("/api/crowd/zones")
 def crowd_zones():
     return fetch_zone_metrics()
+
+@app.get("/api/crowd/zones/live")
+def crowd_zones_live():
+    # Live in-memory per-zone rows (no Supabase dependency)
+    return list(latest_metrics.values())
 
 @app.post("/api/crowd/metrics")
 def update_metrics(data: Metrics):
