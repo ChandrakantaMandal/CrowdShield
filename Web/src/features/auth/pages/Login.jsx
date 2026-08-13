@@ -78,7 +78,7 @@ export default function Login() {
 
             <input
               type="email"
-              placeholder="admin@crowdguardian.ai"
+              placeholder="admin@crowdshield.ai"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-transparent outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900 dark:text-white"
