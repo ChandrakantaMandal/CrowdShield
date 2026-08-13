@@ -6,42 +6,53 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-const cards = [
-  {
-    title: "Active Visitors",
-    value: "1,284",
-    change: "+8.4%",
-    status: "up",
-    icon: Users,
-    iconColor: "text-cyan-600 dark:text-cyan-400",
-  },
-  {
-    title: "Online Cameras",
-    value: "12 / 12",
-    change: "100%",
-    status: "normal",
-    icon: Camera,
-    iconColor: "text-emerald-600 dark:text-emerald-400",
-  },
-  {
-    title: "Active Alerts",
-    value: "03",
-    change: "-2",
-    status: "danger",
-    icon: TriangleAlert,
-    iconColor: "text-red-600 dark:text-red-400",
-  },
-  {
-    title: "Emergency Exits",
-    value: "05",
-    change: "Ready",
-    status: "normal",
-    icon: DoorOpen,
-    iconColor: "text-yellow-600 dark:text-yellow-400",
-  },
-];
+import useLiveData from "../../../lib/useLiveData";
+import { fetchCrowdMetrics, fetchRiskEvents } from "../../../lib/api";
 
 export default function StatsCards() {
+  const metrics = useLiveData(fetchCrowdMetrics, 2000);
+  const riskEvents = useLiveData(() => fetchRiskEvents(50), 2000);
+
+  const peopleCount = metrics.data?.people_count ?? 0;
+  const activeAlerts = (riskEvents.data || []).filter(
+    (event) => event.risk_level && event.risk_level !== "SAFE"
+  ).length;
+
+  const cards = [
+    {
+      title: "Active Visitors",
+      value: peopleCount.toLocaleString(),
+      change: "Live",
+      status: "normal",
+      icon: Users,
+      iconColor: "text-cyan-600 dark:text-cyan-400",
+    },
+    {
+      title: "Online Cameras",
+      value: "12 / 12",
+      change: "100%",
+      status: "normal",
+      icon: Camera,
+      iconColor: "text-emerald-600 dark:text-emerald-400",
+    },
+    {
+      title: "Active Alerts",
+      value: String(activeAlerts).padStart(2, "0"),
+      change: "Live",
+      status: activeAlerts > 0 ? "danger" : "normal",
+      icon: TriangleAlert,
+      iconColor: "text-red-600 dark:text-red-400",
+    },
+    {
+      title: "Emergency Exits",
+      value: "05",
+      change: "Ready",
+      status: "normal",
+      icon: DoorOpen,
+      iconColor: "text-yellow-600 dark:text-yellow-400",
+    },
+  ];
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
       {cards.map((card) => {

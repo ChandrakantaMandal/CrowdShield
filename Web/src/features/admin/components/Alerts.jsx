@@ -1,42 +1,56 @@
 import { TriangleAlert, ShieldCheck, Clock3, ArrowRight } from "lucide-react";
 
-const alerts = [
-  {
-    zone: "Stage Area",
-    level: "Critical",
-    people: 324,
-    confidence: "99%",
-    time: "2 sec ago",
+import useLiveData from "../../../lib/useLiveData";
+import { fetchRiskEvents, formatTime } from "../../../lib/api";
+
+const levelStyles = {
+  CRITICAL: {
     color: "bg-red-500",
     border: "border-red-500/30",
     text: "text-red-600 dark:text-red-400",
-    action: "Open Exit B",
+    action: "Open Exit",
   },
-  {
-    zone: "Main Hall",
-    level: "Warning",
-    people: 187,
-    confidence: "96%",
-    time: "18 sec ago",
+  HIGH: {
+    color: "bg-orange-500",
+    border: "border-orange-500/30",
+    text: "text-orange-600 dark:text-orange-400",
+    action: "Monitor Area",
+  },
+  WARNING: {
     color: "bg-yellow-500",
     border: "border-yellow-500/30",
     text: "text-yellow-600 dark:text-yellow-400",
     action: "Monitor Area",
   },
-  {
-    zone: "North Gate",
-    level: "Normal",
-    people: 42,
-    confidence: "98%",
-    time: "1 min ago",
+  SAFE: {
     color: "bg-emerald-500",
     border: "border-emerald-500/30",
     text: "text-emerald-600 dark:text-emerald-400",
     action: "No Action",
   },
-];
+};
 
 export default function Alerts() {
+  const { data: events, error } = useLiveData(() => fetchRiskEvents(50), 2000);
+
+  const alerts = (events || []).slice(0, 4).map((event) => {
+    const style = levelStyles[event.risk_level] || levelStyles.SAFE;
+
+    return {
+      zone: event.zone_id || "Unknown Zone",
+      level: (event.risk_level || "SAFE").toLowerCase(),
+      score: event.risk_score ?? 0,
+      reason: event.reason || "No details",
+      time: event.created_at ? formatTime(event.created_at) : "—",
+      color: style.color,
+      border: style.border,
+      text: style.text,
+      action: style.action,
+    };
+  });
+
+  const activeCount = alerts.filter((alert) => alert.level !== "safe").length;
+
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-[#111827] overflow-hidden">
       {/* Header */}
@@ -56,15 +70,21 @@ export default function Alerts() {
         </div>
 
         <span className="rounded-full bg-red-500/10 border border-red-500/20 px-3 py-1 text-xs text-red-600 dark:text-red-400">
-          3 Active
+          {activeCount} Active
         </span>
       </div>
 
       {/* Alerts */}
       <div className="p-5 space-y-4">
-        {alerts.map((alert) => (
+        {alerts.length === 0 && (
+          <div className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
+            {error ? "API offline — check VITE_API_URL" : "No risk events yet."}
+          </div>
+        )}
+
+        {alerts.map((alert, index) => (
           <div
-            key={alert.zone}
+            key={`${alert.zone}-${index}`}
             className={`rounded-2xl border ${alert.border} bg-slate-50 dark:bg-white/[0.03] p-5 transition hover:bg-slate-100 dark:hover:bg-white/[0.05]`}
           >
             <div className="flex justify-between items-start">
@@ -80,9 +100,9 @@ export default function Alerts() {
                 </div>
 
                 <div className="mt-3 flex items-center gap-5 text-sm text-slate-500 dark:text-slate-400">
-                  <span>👥 {alert.people} People</span>
+                  <span>🎯 Score {alert.score}</span>
 
-                  <span>🎯 {alert.confidence} Confidence</span>
+                  <span>{alert.reason}</span>
                 </div>
               </div>
 

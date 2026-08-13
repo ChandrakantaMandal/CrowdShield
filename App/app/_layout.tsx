@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { Platform } from "react-native";
 
 import { supabase } from "@/lib/supabase";
+import { RiskNotificationProvider } from "@/components/RiskNotificationProvider";
 import { useAuthStore } from "@/store/authStore";
 import { useThemeStore } from "@/store/themeStore";
 
@@ -54,15 +55,16 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={NAV_THEME[resolved]}>
       <StatusBar style={resolved === "dark" ? "light" : "dark"} />
-
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: BACKGROUND_COLORS[resolved],
-          },
-        }}
-      />
+      <RiskNotificationProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: BACKGROUND_COLORS[resolved],
+            },
+          }}
+        />
+      </RiskNotificationProvider>
 
       <PortalHost />
     </ThemeProvider>

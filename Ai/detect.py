@@ -72,16 +72,19 @@ while True:
     average_speed = tracker.get_average_speed()
     surge_detected = tracker.detect_surge(people_count)
     bottleneck = tracker.detect_bottleneck(boxes)
+    direction = tracker.get_flow_direction()
 
     if time.time() - last_send > 1:
 
         data = {
             "camera_id": "CAM_01",
+            "zone_id": "ZONE_1",
             "people_count": int(people_count),
             "density": float(density),
             "average_speed": float(average_speed),
             "surge_detected": bool(surge_detected),
-            "bottleneck": bool(bottleneck)
+            "bottleneck": bool(bottleneck),
+            "direction": direction
         }
 
         threading.Thread(

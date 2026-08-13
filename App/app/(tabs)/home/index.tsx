@@ -1,13 +1,27 @@
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as React from "react";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Ionicons } from "@expo/vector-icons";
-import { useAuthStore } from "@/store/authStore";
 import { Text } from "@/components/ui/text";
+import {
+  getLatestMetrics,
+  getRiskEvents,
+  type LatestMetrics,
+  type RiskEvent,
+} from "@/lib/api";
+import { useAuthStore } from "@/store/authStore";
+import { usePolling } from "@/lib/use-polling";
 import { useResolvedColorScheme } from "@/lib/use-resolved-color-scheme";
+
+const POLL_INTERVAL_MS = 4000;
 
 const quickActions = [
   {
@@ -22,12 +36,52 @@ const quickActions = [
   },
 ];
 
+function riskColor(level: string | undefined): string {
+  switch (level) {
+    case "CRITICAL":
+      return "#E11D48";
+    case "HIGH":
+      return "#F97316";
+    case "WARNING":
+      return "#FACC15";
+    default:
+      return "#34D399";
+  }
+}
+
+function riskLabel(level: string | undefined): string {
+  switch (level) {
+    case "CRITICAL":
+      return "Critical";
+    case "HIGH":
+      return "High";
+    case "WARNING":
+      return "Warning";
+    default:
+      return "All Clear";
+  }
+}
+
 export default function HomeScreen() {
   const { user, signOut, loading } = useAuthStore();
   const scheme = useResolvedColorScheme();
   const isDark = scheme === "dark";
 
+  const metrics = usePolling<LatestMetrics>({
+    fetcher: getLatestMetrics,
+    intervalMs: POLL_INTERVAL_MS,
+    enabled: !loading,
+  });
+  const riskEvents = usePolling<RiskEvent[]>({
+    fetcher: () => getRiskEvents(1),
+    intervalMs: POLL_INTERVAL_MS,
+    enabled: !loading,
+  });
+
   const firstName = user?.user_metadata?.full_name?.split(" ")[0];
+  const topRisk = riskEvents.data?.[0];
+  const color = topRisk ? riskColor(topRisk.risk_level) : "#34D399";
+  const label = topRisk ? riskLabel(topRisk.risk_level) : "All Clear";
 
   if (loading) {
     return (
@@ -36,6 +90,28 @@ export default function HomeScreen() {
       </View>
     );
   }
+
+  const latest = metrics.data;
+  const crowdCards = [
+    {
+      label: "People",
+      value: latest ? String(latest.people_count) : "—",
+      icon: "people" as const,
+      color: "#818CF8",
+    },
+    {
+      label: "Density",
+      value: latest ? `${latest.density.toFixed(1)}/m²` : "—",
+      icon: "cellular" as const,
+      color: "#38BDF8",
+    },
+    {
+      label: "Avg Speed",
+      value: latest ? `${latest.average_speed.toFixed(1)} m/s` : "—",
+      icon: "speedometer" as const,
+      color: "#FDBA3B",
+    },
+  ];
 
   return (
     <SafeAreaView
@@ -93,13 +169,25 @@ export default function HomeScreen() {
                     Neighborhood Safety
                   </Text>
 
-                  <Text className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                    All Clear
+                  <Text
+                    className="text-2xl font-extrabold"
+                    style={{ color }}
+                  >
+                    {riskEvents.error ? "Offline" : label}
                   </Text>
                 </View>
 
-                <View className="h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10">
-                  <Ionicons name="shield-checkmark" size={28} color="#34D399" />
+                <View
+                  className="h-12 w-12 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: `${color}1A` }}
+                >
+                  <Ionicons
+                    name={
+                      topRisk ? "warning" : "shield-checkmark"
+                    }
+                    size={28}
+                    color={color}
+                  />
                 </View>
               </View>
 
@@ -109,7 +197,7 @@ export default function HomeScreen() {
                     Active Alerts
                   </Text>
                   <Text className="text-lg font-bold text-slate-900 dark:text-white">
-                    0
+                    {riskEvents.data?.length ?? 0}
                   </Text>
                 </View>
 
@@ -117,15 +205,86 @@ export default function HomeScreen() {
 
                 <View className="flex-1 items-end">
                   <Text className="text-xs text-slate-500 dark:text-slate-500">
-                    Members
+                    Zone
                   </Text>
                   <Text className="text-lg font-bold text-slate-900 dark:text-white">
-                    486
+                    {topRisk?.zone_id ?? "—"}
                   </Text>
                 </View>
               </View>
+
+              {metrics.error && !latest ? (
+                <Text className="mt-3 text-xs text-slate-500 dark:text-slate-500">
+                  {metrics.error}
+                </Text>
+              ) : null}
             </View>
           </LinearGradient>
+        </View>
+
+        {/* Live crowd metrics */}
+        <View className="mt-6 gap-3 px-5">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-base font-semibold text-slate-900 dark:text-white">
+              Live Crowd Metrics
+            </Text>
+            {metrics.refreshing ? (
+              <ActivityIndicator size="small" color="#FDBA3B" />
+            ) : null}
+          </View>
+
+          <View className="flex-row gap-3">
+            {crowdCards.map((card) => (
+              <View
+                key={card.label}
+                className="flex-1 rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 p-4"
+              >
+                <View
+                  className="h-9 w-9 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: `${card.color}1A` }}
+                >
+                  <Ionicons name={card.icon} size={18} color={card.color} />
+                </View>
+                <Text className="mt-3 text-lg font-bold text-slate-900 dark:text-white">
+                  {card.value}
+                </Text>
+                <Text className="text-xs text-slate-500 dark:text-slate-500">
+                  {card.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {latest ? (
+            <View className="flex-row gap-3">
+              <View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 px-4 py-3">
+                <Ionicons
+                  name={
+                    latest.surge_detected
+                      ? "trending-up"
+                      : "remove-circle-outline"
+                  }
+                  size={18}
+                  color={latest.surge_detected ? "#F97316" : "#34D399"}
+                />
+                <Text className="text-xs text-slate-500 dark:text-slate-500">
+                  {latest.surge_detected ? "Surge detected" : "No surge"}
+                </Text>
+              </View>
+              <View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 px-4 py-3">
+                <Ionicons
+                  name={
+                    latest.bottleneck ? "alert-circle" : "remove-circle-outline"
+                  }
+                  size={18}
+                  color={latest.bottleneck ? "#F43F5E" : "#34D399"}
+                />
+                <Text className="text-xs text-slate-500 dark:text-slate-500">
+                  {latest.bottleneck ? "Bottleneck" : "Flow normal"}
+                </Text>
+              </View>
+            </View>
+          ) : null}
         </View>
 
         {/* Quick actions */}

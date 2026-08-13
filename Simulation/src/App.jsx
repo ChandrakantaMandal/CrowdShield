@@ -78,11 +78,10 @@ export default function App() {
           const currentMetrics = crowdEngine.getZoneMetrics();
           setZoneMetrics(currentMetrics);
 
-          // Stream active zone telemetry to backend endpoint
-          const activeZData = currentMetrics[activeZone];
-          if (activeZData) {
-            telemetrySync.sendZoneMetrics(activeZData, runId, scenarioKey);
-          }
+          // Stream all zones telemetry to backend endpoint
+          Object.values(currentMetrics).forEach((zoneData) => {
+            telemetrySync.sendZoneMetrics(zoneData, runId, scenarioKey);
+          });
         }
       }
 

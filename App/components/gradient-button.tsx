@@ -3,7 +3,7 @@ import * as React from "react";
 import { ActivityIndicator, Pressable } from "react-native";
 
 import { Text } from "@/components/ui/text";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 
 type GradientButtonProps = {
   title: string;
@@ -28,7 +28,11 @@ export function GradientButton({
       disabled={isDisabled}
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
-      className={cn("w-full self-stretch", isDisabled && "opacity-60", className)}
+      className={cn(
+        "w-full self-stretch",
+        isDisabled && "opacity-60",
+        className,
+      )}
       style={{ borderRadius: 12 }}
     >
       <LinearGradient
