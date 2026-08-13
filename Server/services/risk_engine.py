@@ -29,7 +29,7 @@ def calculate_risk(metrics):
         level = "SAFE"
     elif score <= 60:
         level = "WARNING"
-    elif score <= 80:
+    elif score < 80:
         level = "HIGH"
     else:
         level = "CRITICAL"

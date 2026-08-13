@@ -1,4 +1,4 @@
-import os
+﻿import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -114,3 +114,82 @@ def fetch_risk_events(limit: int = 50) -> dict:
         return {"status": "ok", "data": response.data or []}
     except Exception as e:
         return {"status": "error", "error": str(e), "data": []}
+def insert_alert(alert: dict, risk_event_id: str) -> dict:
+
+    if supabase is None:
+        return {"error": "Supabase not connected"}
+
+    recommendation = alert.get("recommendation", {})
+
+    recommendation_message = recommendation.get(
+        "message",
+        ""
+    )
+
+    main_message = alert.get(
+        "message",
+        "Crowd alert generated."
+    )
+
+    if recommendation_message:
+        final_message = (
+            f"{main_message} "
+            f"{recommendation_message}"
+        )
+    else:
+        final_message = main_message
+
+    row = {
+        "risk_event_id": risk_event_id,
+        "audience": "authority",
+        "message": final_message,
+        "language": "en",
+        "status": "pending"
+    }
+
+    try:
+        response = (
+            supabase
+            .table("alerts")
+            .insert(row)
+            .execute()
+        )
+
+        return {
+            "status": "saved",
+            "data": response.data
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+def fetch_alerts(limit: int = 50) -> dict:
+    if supabase is None:
+        return {
+            "error": "Supabase not connected",
+            "data": []
+        }
+
+    try:
+        response = (
+            supabase
+            .table("alerts")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+
+        return {
+            "status": "ok",
+            "data": response.data or []
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "data": []
+        }    
