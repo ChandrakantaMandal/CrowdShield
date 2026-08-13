@@ -9,13 +9,12 @@ import {
 
 import { useState } from "react";
 
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
-
 import Modal from "./Modal";
-import { Venue3D } from "../../../Map/Venue3D";
 import useLiveData from "../../../lib/useLiveData";
 import { fetchCrowdMetrics, fetchRiskEvents } from "../../../lib/api";
+
+const SIMULATION_MAP_URL =
+  import.meta.env.VITE_SIMULATION_URL || "http://localhost:3000/?view=map";
 
 // Map Body
 function MapBody({ layersOpen }) {
@@ -29,39 +28,14 @@ function MapBody({ layersOpen }) {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#0B1220]">
-      {/* 3D MAP */}
-      <div className="absolute inset-4 overflow-hidden rounded-2xl border border-white/10 bg-[#0B1220]">
-        <Canvas
-          shadows
-          camera={{
-            position: [0, 35, 45],
-            fov: 45,
-          }}
-          dpr={[1, 1.5]}
-          gl={{
-            antialias: true,
-          }}
-        >
-          {/* Lights */}
-          <ambientLight intensity={1} />
-
-          <directionalLight position={[20, 30, 10]} intensity={2} castShadow />
-
-          {/* Venue */}
-
-          <Venue3D />
-
-          {/* Camera */}
-
-          <OrbitControls
-            enablePan
-            enableZoom
-            enableRotate
-            maxPolarAngle={Math.PI / 2.1}
-            minDistance={15}
-            maxDistance={100}
-          />
-        </Canvas>
+      {/* LIVE 3D CROWD SIMULATION (map-only view) */}
+      <div className="absolute inset-0 overflow-hidden bg-[#0B1220]">
+        <iframe
+          src={SIMULATION_MAP_URL}
+          title="Live Crowd Map"
+          className="h-full w-full border-0"
+          allow="accelerometer; gyroscope; camera"
+        />
       </div>
 
       {/*DENSITY LEGEND*/}

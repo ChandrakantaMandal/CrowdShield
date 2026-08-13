@@ -29,6 +29,12 @@ export default function App() {
   const [isStreamingEnabled, setIsStreamingEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Map-only display mode (?view=map): render the 3D digital twin without any dashboard UI
+  const isMapOnly = useMemo(
+    () => new URLSearchParams(window.location.search).get('view') === 'map',
+    []
+  );
+
   // Instantiated Crowd Engine
   const crowdEngine = useMemo(() => new CrowdEngine(220), []);
   const [agents, setAgents] = useState([]);
@@ -92,20 +98,56 @@ export default function App() {
     return () => cancelAnimationFrame(animationFrameId);
   }, [crowdEngine, isPaused, simSpeed, activeZone, runId, scenarioKey]);
 
-  // Scenario change handler
-  const handleSelectScenario = (key) => {
-    setScenarioKey(key);
+  // Apply a scenario to the crowd engine and shared state
+  const applyScenario = (key) => {
     const sc = SCENARIOS[key] || SCENARIOS.normal;
-    crowdEngine.setScenario(key, sc.agentCount);
+    setScenarioKey(sc.id);
+    crowdEngine.setScenario(sc.id, sc.agentCount);
     setAgents([...crowdEngine.agents]);
+  };
+
+  // Sync scenario across app instances (full dashboard + map-only embed) via BroadcastChannel
+  const scenarioChannel = useMemo(() => {
+    if (typeof BroadcastChannel === 'undefined') return null;
+    return new BroadcastChannel('crowdshield-scenario');
+  }, []);
+
+  // Listen for scenario changes from the full dashboard (map-only mode)
+  useEffect(() => {
+    if (!scenarioChannel) return;
+    const onMessage = (event) => {
+      if (event.data?.type === 'scenario' && SCENARIOS[event.data.key]) {
+        applyScenario(event.data.key);
+      }
+    };
+    scenarioChannel.addEventListener('message', onMessage);
+    return () => scenarioChannel.removeEventListener('message', onMessage);
+  }, [scenarioChannel]);
+
+  // Map-only mode: honor an optional ?scenario= param for the initial state
+  useEffect(() => {
+    if (!isMapOnly) return;
+    const initial = new URLSearchParams(window.location.search).get('scenario');
+    if (initial && SCENARIOS[initial]) {
+      applyScenario(initial);
+    }
+  }, []);
+
+  // Scenario change handler (full dashboard)
+  const handleSelectScenario = (key) => {
+    applyScenario(key);
+    if (scenarioChannel) {
+      scenarioChannel.postMessage({ type: 'scenario', key: SCENARIOS[key] ? key : 'normal' });
+    }
   };
 
   // Reset simulation
   const handleReset = () => {
-    setScenarioKey('normal');
+    applyScenario('normal');
     setSimSeconds(0);
-    crowdEngine.setScenario('normal', 220);
-    setAgents([...crowdEngine.agents]);
+    if (scenarioChannel) {
+      scenarioChannel.postMessage({ type: 'scenario', key: 'normal' });
+    }
   };
 
   // Determine highest risk zone for emergency alert banner
@@ -127,41 +169,50 @@ export default function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 select-none">
-      {/* 1. HUD Navigation & Header */}
-      <TopHeader
-        simSeconds={simSeconds}
-        simSpeed={simSpeed}
-        onChangeSimSpeed={setSimSpeed}
-        scenarioKey={scenarioKey}
-        runId={runId}
-        isPaused={isPaused}
-        onTogglePause={() => setIsPaused(!isPaused)}
-        isConnected={isConnected}
-        isStreamingEnabled={isStreamingEnabled}
-        onToggleStreaming={handleToggleStreaming}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
+      {/* 1. HUD Navigation & Header (hidden in map-only mode) */}
+      {!isMapOnly && (
+        <TopHeader
+          simSeconds={simSeconds}
+          simSpeed={simSpeed}
+          onChangeSimSpeed={setSimSpeed}
+          scenarioKey={scenarioKey}
+          runId={runId}
+          isPaused={isPaused}
+          onTogglePause={() => setIsPaused(!isPaused)}
+          isConnected={isConnected}
+          isStreamingEnabled={isStreamingEnabled}
+          onToggleStreaming={handleToggleStreaming}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+        />
+      )}
 
-      {/* 2. Interactive Controls & Telemetry Overlay */}
-      <ControlPanel
-        activeScenario={scenarioKey}
-        onSelectScenario={handleSelectScenario}
-        onReset={handleReset}
-      />
+      {/* 2. Interactive Controls & Telemetry Overlay (hidden in map-only mode) */}
+      {!isMapOnly && (
+        <ControlPanel
+          activeScenario={scenarioKey}
+          onSelectScenario={handleSelectScenario}
+          onReset={handleReset}
+        />
+      )}
 
-      <TelemetryPanel
-        zoneMetrics={zoneMetrics}
-        activeZone={activeZone}
-        onSelectZone={setActiveZone}
-      />
+      {!isMapOnly && (
+        <TelemetryPanel
+          zoneMetrics={zoneMetrics}
+          activeZone={activeZone}
+          onSelectZone={setActiveZone}
+        />
+      )}
 
-      <AlertBanner
-        activeScenario={scenarioKey}
-        highestRiskZone={highestRiskZone}
-        isStampede={scenarioKey === 'stampede'}
-      />
+      {!isMapOnly && (
+        <AlertBanner
+          activeScenario={scenarioKey}
+          highestRiskZone={highestRiskZone}
+          isStampede={scenarioKey === 'stampede'}
+        />
+      )}
 
-      {/* 3. Three.js 3D Digital Twin Canvas */}
+      {/* 3. Three.js 3D Digital Twin Canvas (fills viewport) */}
+      <div className={isMapOnly ? 'absolute inset-0 w-full h-full' : 'relative w-full h-full'}>
       <Canvas shadows gl={{ antialias: true }}>
         <PerspectiveCamera makeDefault position={[0, 45, 55]} fov={50} />
         <OrbitControls
@@ -192,26 +243,33 @@ export default function App() {
         {/* 3D Scene Components */}
         <Venue3D activeZone={activeZone} zoneRiskData={zoneMetrics} />
         <CrowdAgents agents={agents} scenario={scenarioKey} />
-        <EmergencyPath3D
-          activeScenario={scenarioKey}
-          isCritical={highestRiskZone?.risk?.level === 'CRITICAL'}
-        />
-        <ZoneLabels3D
-          zoneMetrics={zoneMetrics}
-          activeZone={activeZone}
-          onSelectZone={setActiveZone}
-        />
+        {!isMapOnly && (
+          <>
+            <EmergencyPath3D
+              activeScenario={scenarioKey}
+              isCritical={highestRiskZone?.risk?.level === 'CRITICAL'}
+            />
+            <ZoneLabels3D
+              zoneMetrics={zoneMetrics}
+              activeZone={activeZone}
+              onSelectZone={setActiveZone}
+            />
+          </>
+        )}
       </Canvas>
+      </div>
 
-      {/* 4. Configuration Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        apiUrl={apiUrl}
-        onSaveApiUrl={setApiUrl}
-        runId={runId}
-        onSaveRunId={setRunId}
-      />
+      {/* 4. Configuration Settings Modal (hidden in map-only mode) */}
+      {!isMapOnly && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          apiUrl={apiUrl}
+          onSaveApiUrl={setApiUrl}
+          runId={runId}
+          onSaveRunId={setRunId}
+        />
+      )}
     </div>
   );
 }
