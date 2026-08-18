@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from services.safe_gate_service import find_safe_gate
+from shared_data import gate_locations
 
 
 router = APIRouter(
@@ -10,6 +11,12 @@ router = APIRouter(
 
 @router.get("/{current_gate}")
 def get_safe_gate(current_gate: str):
+
+    if current_gate not in gate_locations:
+        return {
+            "message": "Invalid gate_id",
+            "current_gate": current_gate
+        }
 
     safe_gate = find_safe_gate(current_gate)
 

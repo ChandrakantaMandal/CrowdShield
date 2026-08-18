@@ -11,7 +11,7 @@ import { useState } from "react";
 
 import Modal from "./Modal";
 import useLiveData from "../../../lib/useLiveData";
-import { fetchCrowdMetrics, fetchRiskEvents } from "../../../lib/api";
+import { fetchCrowdMetrics, fetchAlerts } from "../../../lib/api";
 
 const SIMULATION_MAP_URL =
   import.meta.env.VITE_SIMULATION_URL || "http://localhost:3000/?view=map";
@@ -19,7 +19,7 @@ const SIMULATION_MAP_URL =
 // Map Body
 function MapBody({ layersOpen }) {
   const metrics = useLiveData(fetchCrowdMetrics, 2000);
-  const riskEvents = useLiveData(() => fetchRiskEvents(50), 2000);
+  const riskEvents = useLiveData(() => fetchAlerts(50), 5000);
 
   const peopleCount = metrics.data?.people_count ?? 0;
   const highRiskZones = (riskEvents.data || []).filter((event) =>

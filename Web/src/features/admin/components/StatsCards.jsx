@@ -7,11 +7,11 @@ import {
 } from "lucide-react";
 
 import useLiveData from "../../../lib/useLiveData";
-import { fetchCrowdMetrics, fetchRiskEvents } from "../../../lib/api";
+import { fetchCrowdMetrics, fetchAlerts } from "../../../lib/api";
 
 export default function StatsCards() {
   const metrics = useLiveData(fetchCrowdMetrics, 2000);
-  const riskEvents = useLiveData(() => fetchRiskEvents(50), 2000);
+  const riskEvents = useLiveData(() => fetchAlerts(50), 5000);
 
   const peopleCount = metrics.data?.people_count ?? 0;
   const activeAlerts = (riskEvents.data || []).filter(

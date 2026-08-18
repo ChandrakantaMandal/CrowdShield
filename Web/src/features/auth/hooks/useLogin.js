@@ -9,10 +9,12 @@ export default function useLogin() {
   const { setUser, setProfile } = useAuthStore();
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const login = async (email, password) => {
     try {
       setLoading(true);
+      setError(null);
 
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -43,20 +45,17 @@ export default function useLogin() {
       setUser(user);
       setProfile(profile);
 
-      console.log("Before navigate");
       navigate("/dashboard");
-      console.log("After navigate");
     } catch (err) {
-      alert(err.message);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  
-
   return {
     login,
     loading,
+    error,
   };
 }

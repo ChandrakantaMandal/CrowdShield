@@ -19,6 +19,11 @@ export async function fetchRiskEvents(limit = 50) {
   return Array.isArray(data) ? data : data?.data || [];
 }
 
+export async function fetchAlerts(limit = 50) {
+  const data = await request(`/api/db/alerts?limit=${limit}`);
+  return Array.isArray(data) ? data : data?.data || [];
+}
+
 export async function fetchCrowdHistory(limit = 50, zoneId) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (zoneId) params.set("zone_id", zoneId);

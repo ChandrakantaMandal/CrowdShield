@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from models import Metrics
-from shared_data import gate_metrics
+from shared_data import gate_metrics, gate_locations
 
 
 router = APIRouter(
@@ -12,9 +12,9 @@ router = APIRouter(
 @router.post("/{gate_id}/metrics")
 def update_gate_metrics(gate_id: str, data: Metrics):
 
-    if gate_id not in gate_metrics:
+    if gate_id not in gate_locations:
         return {
-            "message": "Gate not found",
+            "message": "Invalid gate_id",
             "gate_id": gate_id
         }
 

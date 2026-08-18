@@ -7,10 +7,10 @@ import {
 } from "lucide-react";
 
 import useLiveData from "../../../lib/useLiveData";
-import { fetchRiskEvents, formatTime } from "../../../lib/api";
+import { fetchAlerts, formatTime } from "../../../lib/api";
 
 export default function Alerts() {
-  const { data: events } = useLiveData(() => fetchRiskEvents(50), 2000);
+  const { data: events } = useLiveData(() => fetchAlerts(50), 5000);
 
   const alerts = (events || []).map((event, index) => {
     const level = event.risk_level || "SAFE";
@@ -26,7 +26,7 @@ export default function Alerts() {
           : level === "WARNING"
           ? "Warning"
           : "Safe",
-      message: event.reason || "No details provided.",
+      message: event.message || "No details provided.",
       time: event.created_at ? formatTime(event.created_at) : "—",
     };
   });
