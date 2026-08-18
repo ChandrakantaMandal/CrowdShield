@@ -13,8 +13,6 @@ export default function useLogout() {
       setUser(null);
       setProfile(null);
 
-      localStorage.removeItem("token");
-
       navigate("/", { replace: true });
     } catch (err) {
       console.error(err);

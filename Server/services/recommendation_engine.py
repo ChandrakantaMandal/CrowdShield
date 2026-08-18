@@ -21,8 +21,13 @@ def get_recommendation(risk_level):
             "Broadcast Warning"
         ]
 
-    else:   
-        return "Close Gate G3. Open Exit E2. Redirect Crowd. Call Emergency Team."
+    else:
+        return [
+            "Close Gate G3",
+            "Open Exit E2",
+            "Redirect Crowd",
+            "Call Emergency Team"
+        ]
 
 
 

@@ -57,6 +57,9 @@ def calculate_direction(current_gate, safe_gate):
 
 def find_safe_gate(current_gate):
 
+    if current_gate not in gate_locations:
+        return None
+
     safe_gates = []
 
     for gate_id, metrics in gate_metrics.items():

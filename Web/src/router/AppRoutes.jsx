@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 
 import ProtectedRoute from "./ProtectedRoute";
+import ErrorBoundary from "./ErrorBoundary";
 
 const Login = lazy(() => import("../features/auth/pages/Login"));
 
@@ -20,7 +21,8 @@ const Settings = lazy(() => import("../features/admin/pages/Settings"));
 export default function AppRoutes() {
   return (
     <BrowserRouter>
-      <Suspense
+      <ErrorBoundary>
+        <Suspense
         fallback={
           <div className="h-screen flex items-center justify-center bg-slate-100 dark:bg-[#0B1220] text-slate-900 dark:text-white">
             Loading...
@@ -47,7 +49,8 @@ export default function AppRoutes() {
   <Route path="settings" element={<Settings />} />
 </Route>
         </Routes>
-      </Suspense>
+        </Suspense>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

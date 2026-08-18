@@ -27,7 +27,7 @@ function zoneConfig(zoneId) {
 }
 
 export default function TelemetryPanel() {
-  const { data: zones, error: zonesError, loading: zonesLoading } = useLiveData(fetchZoneMetrics, 2000);
+  const { data: zones, error: zonesError, loading: zonesLoading } = useLiveData(fetchZoneMetrics, 5000);
   const { data: snapshot, error: snapshotError } = useLiveData(fetchCrowdMetrics, 2000);
 
   const zoneRows = Array.isArray(zones) ? zones : [];

@@ -26,7 +26,9 @@ export default function App() {
   const [runId, setRunId] = useState(import.meta.env.VITE_DEFAULT_RUN_ID || 'DEMO-STAMPEDE-001');
   const [apiUrl, setApiUrl] = useState(import.meta.env.VITE_API_URL || 'http://localhost:8000');
   const [isConnected, setIsConnected] = useState(false);
-  const [isStreamingEnabled, setIsStreamingEnabled] = useState(false);
+  const [isStreamingEnabled, setIsStreamingEnabled] = useState(
+    () => typeof localStorage !== 'undefined' && localStorage.getItem('crowdshield.streaming') === 'true'
+  );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Map-only display mode (?view=map): render the 3D digital twin without any dashboard UI
@@ -36,7 +38,7 @@ export default function App() {
   );
 
   // Instantiated Crowd Engine
-  const crowdEngine = useMemo(() => new CrowdEngine(220), []);
+  const crowdEngine = useMemo(() => new CrowdEngine(Number(import.meta.env.VITE_AGENT_COUNT) || 220), []);
   const [agents, setAgents] = useState([]);
   const [zoneMetrics, setZoneMetrics] = useState({});
 
@@ -49,20 +51,26 @@ export default function App() {
         setIsStreamingEnabled(status.enabled);
       }
     });
+
+    // Reconnect the last streaming preference, or always stream when embedded
+    // as a map-only view so the admin dashboard keeps receiving live data.
+    if (isMapOnly || localStorage.getItem('crowdshield.streaming') === 'true') {
+      telemetrySync.setStreamingEnabled(true);
+    }
     return () => unsubscribe();
-  }, [apiUrl]);
+  }, [apiUrl, isMapOnly]);
 
   const handleToggleStreaming = () => {
     const nextState = !isStreamingEnabled;
+    localStorage.setItem('crowdshield.streaming', String(nextState));
     setIsStreamingEnabled(nextState);
     telemetrySync.setStreamingEnabled(nextState);
   };
 
-  // Main Simulation Animation & Telemetry Tick Loop
+  // Main Simulation Animation Loop (render/physics only)
   useEffect(() => {
     let animationFrameId;
     let lastTime = performance.now();
-    let telemetryTimer = 0;
 
     const tick = (now) => {
       const deltaSeconds = (now - lastTime) / 1000;
@@ -76,19 +84,6 @@ export default function App() {
 
         // Advance simulation clock
         setSimSeconds((prev) => prev + deltaSeconds * simSpeed);
-
-        // Periodically aggregate metrics and stream telemetry
-        telemetryTimer += deltaSeconds;
-        if (telemetryTimer >= 1.0) {
-          telemetryTimer = 0;
-          const currentMetrics = crowdEngine.getZoneMetrics();
-          setZoneMetrics(currentMetrics);
-
-          // Stream all zones telemetry to backend endpoint
-          Object.values(currentMetrics).forEach((zoneData) => {
-            telemetrySync.sendZoneMetrics(zoneData, runId, scenarioKey);
-          });
-        }
       }
 
       animationFrameId = requestAnimationFrame(tick);
@@ -96,7 +91,38 @@ export default function App() {
 
     animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [crowdEngine, isPaused, simSpeed, activeZone, runId, scenarioKey]);
+  }, [crowdEngine, isPaused, simSpeed]);
+
+  // Telemetry heartbeat - runs on its own timer so it keeps streaming even when
+  // the tab is backgrounded (browsers throttle rAF there, starving the feed).
+  useEffect(() => {
+    const sendTelemetry = () => {
+      const currentMetrics = crowdEngine.getZoneMetrics();
+      setZoneMetrics(currentMetrics);
+
+      // Stream all zones telemetry to backend endpoint
+      Object.values(currentMetrics).forEach((zoneData) => {
+        telemetrySync.sendZoneMetrics(zoneData, runId, scenarioKey);
+      });
+    };
+
+    const timer = setInterval(sendTelemetry, 1000);
+
+    // Reconnect instantly when the tab regains focus: background tabs throttle
+    // timers (intensively after ~5 min), so the next setInterval tick could be
+    // delayed by up to a minute. Fire one send immediately instead.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        sendTelemetry();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [crowdEngine, runId, scenarioKey]);
 
   // Apply a scenario to the crowd engine and shared state
   const applyScenario = (key) => {

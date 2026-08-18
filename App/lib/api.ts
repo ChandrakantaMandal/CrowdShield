@@ -1,8 +1,4 @@
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-if (!API_URL) {
-  throw new Error("EXPO_PUBLIC_API_URL is not configured");
-}
+import { supabase } from "./supabase";
 
 export interface LatestMetrics {
   camera_id: string;
@@ -33,56 +29,72 @@ export interface RiskEvent {
   created_at: string;
 }
 
-interface ListResponse<T> {
-  status: "ok" | "error";
-  data?: T[];
-  error?: string;
-}
+export async function getLatestMetrics(): Promise<LatestMetrics> {
+  const { data, error } = await supabase
+    .from("crowd_data")
+    .select("camera_id, people_count, density, speed, surge_detected, bottleneck")
+    .order("timestamp", { ascending: false })
+    .limit(1)
+    .single();
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`);
-
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+  if (error) {
+    throw new Error(error.message);
   }
 
-  return response.json() as Promise<T>;
-}
-
-export async function getLatestMetrics(): Promise<LatestMetrics> {
-  return request<LatestMetrics>("/api/crowd/metrics");
+  return {
+    camera_id: data.camera_id,
+    people_count: data.people_count,
+    density: data.density,
+    average_speed: data.speed ?? 0,
+    surge_detected: data.surge_detected,
+    bottleneck: data.bottleneck,
+  };
 }
 
 export async function getCrowdHistory(
   limit = 10,
   zoneId?: string
 ): Promise<CrowdHistoryRow[]> {
-  const query = new URLSearchParams({ limit: String(limit) });
+  let query = supabase
+    .from("crowd_data")
+    .select("camera_id, zone_id, people_count, density, speed, direction, surge_detected, bottleneck, timestamp")
+    .order("timestamp", { ascending: false })
+    .limit(limit);
+
   if (zoneId) {
-    query.set("zone_id", zoneId);
+    query = query.eq("zone_id", zoneId);
   }
 
-  const body = await request<ListResponse<CrowdHistoryRow>>(
-    `/api/crowd/history?${query.toString()}`
-  );
+  const { data, error } = await query;
 
-  if (body.status !== "ok" || !body.data) {
-    throw new Error(body.error ?? "Failed to fetch crowd history");
+  if (error) {
+    throw new Error(error.message);
   }
 
-  return body.data;
+  return (data ?? []).map((row) => ({
+    camera_id: row.camera_id,
+    zone_id: row.zone_id,
+    people_count: row.people_count,
+    density: row.density,
+    speed: row.speed,
+    direction: row.direction,
+    surge_detected: row.surge_detected,
+    bottleneck: row.bottleneck,
+    created_at: row.timestamp,
+  }));
 }
 
 export async function getRiskEvents(limit = 20): Promise<RiskEvent[]> {
-  const query = new URLSearchParams({ limit: String(limit) });
+  const { data, error } = await supabase
+    .from("risk_events")
+    .select("*")
+    .neq("risk_level", "SAFE")
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
-  const body = await request<ListResponse<RiskEvent>>(
-    `/api/risk/events?${query.toString()}`
-  );
-
-  if (body.status !== "ok" || !body.data) {
-    throw new Error(body.error ?? "Failed to fetch risk events");
+  if (error) {
+    throw new Error(error.message);
   }
 
-  return body.data;
+  return (data ?? []) as RiskEvent[];
 }

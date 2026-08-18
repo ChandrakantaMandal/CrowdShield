@@ -16,7 +16,7 @@ import useLogout from "../../auth/hooks/useLogout";
 import useSidebarStore from "../../../store/useSidebarStore";
 import { NavLink } from "react-router-dom";
 import useLiveData from "../../../lib/useLiveData";
-import { fetchCrowdMetrics, fetchRiskEvents, fetchZoneMetrics } from "../../../lib/api";
+import { fetchCrowdMetrics, fetchAlerts, fetchZoneMetrics } from "../../../lib/api";
 
 export default function Sidebar() {
   const close = useSidebarStore((s) => s.close);
@@ -220,8 +220,8 @@ function riskLevelFromMetrics(metrics) {
 
 function LiveAnalytics() {
   const { data: metrics } = useLiveData(fetchCrowdMetrics, 2000);
-  const { data: zoneRows } = useLiveData(fetchZoneMetrics, 2000);
-  const { data: riskEvents } = useLiveData(() => fetchRiskEvents(50), 2000);
+  const { data: zoneRows } = useLiveData(fetchZoneMetrics, 5000);
+  const { data: riskEvents } = useLiveData(() => fetchAlerts(50), 5000);
 
   const zones = Array.isArray(zoneRows) ? zoneRows : [];
   const liveZones = zones.filter((zone) => (zone.people_count || 0) > 0).length;

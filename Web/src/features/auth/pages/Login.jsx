@@ -13,7 +13,7 @@ import { useState } from "react";
 import useLogin from "../hooks/useLogin";
 
 export default function Login() {
-  const { login, loading } = useLogin();
+  const { login, loading, error } = useLogin();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -156,6 +156,13 @@ export default function Login() {
             </>
           )}
         </motion.button>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-600 dark:text-red-400 text-center">
+            {error}
+          </div>
+        )}
 
         {/* Divider */}
         <div className="flex items-center my-8">

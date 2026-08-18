@@ -5,6 +5,8 @@ export default function useLiveData(fetcher, intervalMs = 2000, deps = []) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const fetcherRef = useRef(fetcher);
+  const timerRef = useRef(null);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
     fetcherRef.current = fetcher;
@@ -14,6 +16,11 @@ export default function useLiveData(fetcher, intervalMs = 2000, deps = []) {
     let cancelled = false;
 
     async function poll() {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       try {
         const result = await fetcherRef.current();
         if (!cancelled) {
@@ -23,16 +30,38 @@ export default function useLiveData(fetcher, intervalMs = 2000, deps = []) {
       } catch (err) {
         if (!cancelled) setError(err);
       } finally {
+        inFlightRef.current = false;
         if (!cancelled) setLoading(false);
       }
     }
 
-    poll();
-    const timer = setInterval(poll, intervalMs);
+    function start() {
+      stop();
+      poll();
+      timerRef.current = setInterval(poll, intervalMs);
+    }
+
+    function stop() {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        // Reconnect immediately instead of waiting for the next throttled tick.
+        poll();
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    start();
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intervalMs, ...deps]);
