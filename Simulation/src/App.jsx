@@ -52,13 +52,36 @@ export default function App() {
       }
     });
 
-    // Reconnect the last streaming preference, or always stream when embedded
-    // as a map-only view so the admin dashboard keeps receiving live data.
-    if (isMapOnly || localStorage.getItem('crowdshield.streaming') === 'true') {
+    if (!isMapOnly && localStorage.getItem('crowdshield.streaming') === 'true') {
       telemetrySync.setStreamingEnabled(true);
     }
     return () => unsubscribe();
   }, [apiUrl, isMapOnly]);
+
+  useEffect(() => {
+    if (!isMapOnly) return;
+    let cancelled = false;
+    const checkLive = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/api/crowd/metrics`, {
+          headers: { Accept: 'application/json' }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setIsConnected(Number(data?.people_count || 0) > 0);
+        }
+      } catch {
+        if (!cancelled) setIsConnected(false);
+      }
+    };
+    checkLive();
+    const timer = setInterval(checkLive, 1500);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [isMapOnly, apiUrl]);
 
   const handleToggleStreaming = () => {
     const nextState = !isStreamingEnabled;
@@ -268,7 +291,10 @@ export default function App() {
 
         {/* 3D Scene Components */}
         <Venue3D activeZone={activeZone} zoneRiskData={zoneMetrics} />
-        <CrowdAgents agents={agents} scenario={scenarioKey} />
+        <CrowdAgents
+          agents={isMapOnly && !isConnected ? [] : agents}
+          scenario={scenarioKey}
+        />
         {!isMapOnly && (
           <>
             <EmergencyPath3D

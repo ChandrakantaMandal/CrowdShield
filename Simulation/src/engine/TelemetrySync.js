@@ -40,7 +40,11 @@ export class TelemetrySync {
   setStreamingEnabled(enabled) {
     this.isStreamingEnabled = enabled;
     if (enabled) {
+      // Manual reconnect: allow an immediate attempt
       this.lastAttemptTime = 0;
+    } else {
+      // Manual disconnect: stop the stream and clear the live connection state
+      this.isConnected = false;
     }
     this.notify({ connected: this.isConnected, enabled: this.isStreamingEnabled });
   }
@@ -99,9 +103,13 @@ export class TelemetrySync {
 
       if (response.ok) {
         const data = await response.json();
+        // Manual disconnect while this request was in flight: do not re-mark as connected
+        if (!this.isStreamingEnabled) {
+          return { success: false, standalone: true };
+        }
         this.isConnected = true;
         this.lastResponse = data;
-        this.notify({ connected: true, enabled: true, lastSent: payload, response: data });
+        this.notify({ connected: true, enabled: this.isStreamingEnabled, lastSent: payload, response: data });
         return { success: true, data };
       } else {
         throw new Error(`HTTP Error ${response.status}`);

@@ -28,7 +28,10 @@ export default function useLiveData(fetcher, intervalMs = 2000, deps = []) {
           setError(null);
         }
       } catch (err) {
-        if (!cancelled) setError(err);
+        if (!cancelled) {
+          setError(err);
+          setData(null);
+        }
       } finally {
         inFlightRef.current = false;
         if (!cancelled) setLoading(false);
