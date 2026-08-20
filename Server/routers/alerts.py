@@ -5,7 +5,7 @@ from services.risk_engine import calculate_risk
 from services.recommendation_engine import get_final_recommendation
 from models import Metrics
 from db import insert_risk_event, insert_alert
-from shared_data import gate_locations
+from shared_data import latest_metrics
 
 
 router = APIRouter(
@@ -17,10 +17,10 @@ router = APIRouter(
 @router.post("/create")
 def create_alert_api(metrics: Metrics, zone_id: str):
 
-    if zone_id not in gate_locations and zone_id != "ALL":
+    if zone_id != "ALL" and zone_id not in latest_metrics:
         return {
-            "message": "Invalid zone_id",
-            "zone_id": zone_id
+        "message": "Invalid zone_id",
+        "zone_id": zone_id
         }
 
     risk = calculate_risk(

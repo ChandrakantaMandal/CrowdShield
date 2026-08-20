@@ -46,9 +46,10 @@ def _flush_batch_locked() -> None:
     if supabase is None or not _batch_buffer:
         return
     rows = list(_batch_buffer)
-    _batch_buffer.clear()
+
     try:
         supabase.table("crowd_data").insert(rows).execute()
+        _batch_buffer.clear()
     except Exception as e:
         print(f"[db] crowd_data batch insert failed: {e}")
 
