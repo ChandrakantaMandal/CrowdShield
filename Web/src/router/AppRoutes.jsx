@@ -6,6 +6,10 @@ import ErrorBoundary from "./ErrorBoundary";
 
 const Login = lazy(() => import("../features/auth/pages/Login"));
 
+const ResetPassword = lazy(
+  () => import("../features/auth/pages/ResetPassword"),
+);
+
 const DashboardLayout = lazy(
   () => import("../features/admin/layout/DashboardLayout"),
 );
@@ -31,6 +35,7 @@ export default function AppRoutes() {
       >
         <Routes>
           <Route path="/" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           <Route
   path="/dashboard"
