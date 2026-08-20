@@ -12,7 +12,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "Server"))
 
 model = YOLO("models/yolov8s.pt")
-cap = cv2.VideoCapture("videos/demo3.mp4")
+cap = cv2.VideoCapture("videos/demo2.mp4")
 
 tracker = Tracker()
 last_send = time.time()
