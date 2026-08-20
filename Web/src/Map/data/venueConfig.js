@@ -68,7 +68,8 @@ export const ZONES = {
 
 export const EMERGENCY_EXIT = {
   id: 'EMERGENCY_EXIT',
-  name: 'WEST EMERGENCY EVACUATION GATE',
+  name: 'Gate 2 - West Emergency Exit',
+  shortName: 'Gate 2 (West Exit)',
   location: [-30, 0, -4], // Optimal West evacuation concourse between Main Stage & Hall A
   doorWidth: 10,
   glowColor: '#ef4444' // Red alert
@@ -76,7 +77,8 @@ export const EMERGENCY_EXIT = {
 
 export const MAIN_ENTRY = {
   id: 'MAIN_ENTRY',
-  name: 'MAIN ENTRANCE GATE',
+  name: 'Gate 1 - South Main Entrance',
+  shortName: 'Gate 1 (Main South Ingress)',
   location: [0, 0, 31],
   width: 12,
   color: '#06b6d4'
@@ -84,7 +86,8 @@ export const MAIN_ENTRY = {
 
 export const PUBLIC_EXIT = {
   id: 'PUBLIC_EXIT',
-  name: 'PUBLIC EXIT GATE (ZONE B)',
+  name: 'Gate 3 - East Public Exit',
+  shortName: 'Gate 3 (East Exit)',
   location: [30, 0, 9],
   width: 12,
   color: '#10b981'
