@@ -11,6 +11,8 @@ from routers.alerts import router as alerts_router
 from routers.safe_gate import router as safe_gate_router
 from routers.gate import router as gate_router
 from routers.db import router as db_router
+from routers.assistant import router as assistant_router
+from routers.crowd import router as crowd_router
 
 
 from shared_data import latest_metrics, last_risk_level, touch_zone, prune_stale_metrics
@@ -44,6 +46,8 @@ app.include_router(alerts_router)
 app.include_router(safe_gate_router)
 app.include_router(gate_router)
 app.include_router(db_router)
+app.include_router(assistant_router)
+app.include_router(crowd_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -111,25 +115,7 @@ def status():
         "last_updated": agg["timestamp"],
     }
 
-@app.get("/api/crowd/metrics")
-def get_metrics():
-    return aggregate_metrics()
 
-@app.get("/api/crowd/history")
-def crowd_history(limit: int = 50, zone_id: str | None = None):
-    return fetch_crowd_history(limit=limit, zone_id=zone_id)
-
-@app.get("/api/crowd/zones")
-def crowd_zones():
-    return fetch_zone_metrics()
-
-@app.get("/api/crowd/zones/live")
-def crowd_zones_live():
-    # Live in-memory per-zone rows (no Supabase dependency)
-    prune_stale_metrics()
-    return list(latest_metrics.values())
-
-@app.post("/api/crowd/metrics")
 @limiter.limit("600/minute")
 def update_metrics(request: Request, data: Metrics):
 
