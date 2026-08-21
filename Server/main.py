@@ -46,12 +46,18 @@ app.include_router(safe_gate_router)
 app.include_router(gate_router)
 app.include_router(db_router)
 
-FRONTEND_URLS = os.getenv("FRONTEND_URL", "https://crowd-shield-simulation.vercel.app")
-allowed_origins = [o.strip() for o in FRONTEND_URLS.split(",") if o.strip()]
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+simulation_url = os.getenv("SIMULATION_URL", "http://localhost:3000")
+
+allowed_origins = [
+    url.strip()
+    for url in [frontend_url, simulation_url]
+    if url.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins + ["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
