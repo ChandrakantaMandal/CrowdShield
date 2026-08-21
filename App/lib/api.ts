@@ -30,6 +30,10 @@ export interface RiskEvent {
 }
 
 export async function getLatestMetrics(): Promise<LatestMetrics> {
+  if (!supabase) {
+    throw new Error("Supabase not configured — check EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY");
+  }
+
   const { data, error } = await supabase
     .from("crowd_data")
     .select("camera_id, people_count, density, speed, surge_detected, bottleneck")
@@ -55,6 +59,10 @@ export async function getCrowdHistory(
   limit = 10,
   zoneId?: string
 ): Promise<CrowdHistoryRow[]> {
+  if (!supabase) {
+    throw new Error("Supabase not configured — check EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY");
+  }
+
   let query = supabase
     .from("crowd_data")
     .select("camera_id, zone_id, people_count, density, speed, direction, surge_detected, bottleneck, timestamp")
@@ -85,6 +93,10 @@ export async function getCrowdHistory(
 }
 
 export async function getRiskEvents(limit = 20): Promise<RiskEvent[]> {
+  if (!supabase) {
+    throw new Error("Supabase not configured — check EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY");
+  }
+
   const { data, error } = await supabase
     .from("risk_events")
     .select("*")

@@ -21,26 +21,37 @@ export const useAuthStore = create<AuthState>((set) => ({
     }),
 
   checkAuth: async () => {
-    const { supabase } = await import("@/lib/supabase");
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      if (!supabase) {
+        set({ user: null, loading: false });
+        return;
+      }
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    set({
-      user: session?.user ?? null,
-      loading: false,
-    });
+      set({
+        user: session?.user ?? null,
+        loading: false,
+      });
+    } catch (err) {
+      console.error("[AuthStore] checkAuth failed:", err);
+      set({ user: null, loading: false });
+    }
   },
 
   signOut: async () => {
-    const { supabase } = await import("@/lib/supabase");
-
-    await supabase.auth.signOut();
-
-    set({
-      user: null,
-      loading: false,
-    });
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (err) {
+      console.error("[AuthStore] signOut failed:", err);
+    } finally {
+      set({ user: null, loading: false });
+    }
   },
 }));
