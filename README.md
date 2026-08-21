@@ -283,6 +283,39 @@ Run migrations in order in the **Supabase SQL Editor**:
 - Node.js 18+ (npm)
 - A Supabase project (free tier) with URL + anon key
 
+### 0b. Docker (dev-mode, optional)
+
+All three services (Server, Web, Simulation) run as Vite/Vitest-style **dev
+containers** — code is mounted fresh at build time, so no hot-reload bind-mount
+is configured. Requires Docker Desktop running.
+
+```bash
+# from repo root — build images (first time, a few minutes)
+docker compose build
+
+# start everything: server :8000, web :5173, simulation :3000
+docker compose up
+
+# background mode (Ctrl+C won't stop it)
+docker compose up -d
+
+# tail logs / stop / full reset
+docker compose logs -f
+docker compose down
+docker compose down -v   # also drops container volumes
+```
+
+Notes:
+
+- `Server` reads credentials from `Server/.env` via `env_file`. No Supabase
+  credentials? The container still boots — persistence just degrades gracefully.
+- `Web`/`Simulation` receive `VITE_API_URL` from your shell
+  (`VITE_API_URL=http://localhost:8000` default). Override without editing files:
+  `VITE_API_URL=http://<your-lan-ip>:8000 docker compose up web`.
+- Healthcheck: `server` must be healthy before `web`/`simulation` start
+  (`depends_on: condition: service_healthy`).
+- Everything here is the **dev** path; the built/non-dev path is out of scope
+
 ### 1. Backend (`Server/`)
 
 ```bash

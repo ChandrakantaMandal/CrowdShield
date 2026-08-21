@@ -1,7 +1,7 @@
 import { TriangleAlert, ShieldCheck, Clock3, ArrowRight } from "lucide-react";
 
 import useLiveData from "../../../lib/useLiveData";
-import { fetchRiskEvents, formatTime } from "../../../lib/api";
+import { fetchAlerts, formatTime } from "../../../lib/api";
 
 const levelStyles = {
   CRITICAL: {
@@ -31,7 +31,7 @@ const levelStyles = {
 };
 
 export default function Alerts() {
-  const { data: events, error } = useLiveData(() => fetchRiskEvents(50), 2000);
+  const { data: events, error } = useLiveData(() => fetchAlerts(50), 5000);
 
   const alerts = (events || []).slice(0, 4).map((event) => {
     const style = levelStyles[event.risk_level] || levelStyles.SAFE;
@@ -39,8 +39,8 @@ export default function Alerts() {
     return {
       zone: event.zone_id || "Unknown Zone",
       level: (event.risk_level || "SAFE").toLowerCase(),
-      score: event.risk_score ?? 0,
-      reason: event.reason || "No details",
+      score: event.risk_score ?? null,
+      reason: event.message || "No details",
       time: event.created_at ? formatTime(event.created_at) : "—",
       color: style.color,
       border: style.border,
@@ -100,7 +100,7 @@ export default function Alerts() {
                 </div>
 
                 <div className="mt-3 flex items-center gap-5 text-sm text-slate-500 dark:text-slate-400">
-                  <span>🎯 Score {alert.score}</span>
+                  {alert.score != null && <span>🎯 Score {alert.score}</span>}
 
                   <span>{alert.reason}</span>
                 </div>

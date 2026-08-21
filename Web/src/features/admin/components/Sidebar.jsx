@@ -15,6 +15,8 @@ import {
 import useLogout from "../../auth/hooks/useLogout";
 import useSidebarStore from "../../../store/useSidebarStore";
 import { NavLink } from "react-router-dom";
+import useLiveData from "../../../lib/useLiveData";
+import { fetchCrowdMetrics, fetchAlerts, fetchZoneMetrics } from "../../../lib/api";
 
 export default function Sidebar() {
   const close = useSidebarStore((s) => s.close);
@@ -116,10 +118,10 @@ function SidebarContent() {
                 to={item.path}
                 end={item.path === "/dashboard"}
                 className={({ isActive }) =>
-                  `group flex w-full items-center justify-between rounded-xl px-4 py-3 transition-all duration-200 ${
+                  `group flex w-full items-center justify-between rounded-xl border px-4 py-3 ${
                     isActive
-                      ? "border border-cyan-500/20 bg-cyan-500/10"
-                      : "hover:bg-slate-100 dark:hover:bg-white/5"
+                      ? "border-cyan-500/20 bg-cyan-500/10"
+                      : "border-transparent hover:bg-slate-100 dark:hover:bg-white/5"
                   }`
                 }
               >
@@ -128,7 +130,7 @@ function SidebarContent() {
                     <div className="flex items-center gap-3">
                       <Icon
                         size={18}
-                        className={`transition-colors ${
+                        className={`${
                           isActive
                             ? "text-cyan-600 dark:text-cyan-400"
                             : "text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white"
@@ -136,7 +138,7 @@ function SidebarContent() {
                       />
 
                       <span
-                        className={`transition-colors ${
+                        className={`${
                           isActive
                             ? "font-medium text-slate-900 dark:text-white"
                             : "text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white"
@@ -148,7 +150,7 @@ function SidebarContent() {
 
                     <ChevronRight
                       size={16}
-                      className={`transition-transform ${
+                      className={`${
                         isActive
                           ? "translate-x-1 text-cyan-600 dark:text-cyan-400"
                           : "text-slate-500 dark:text-slate-600 group-hover:translate-x-1"
@@ -163,51 +165,17 @@ function SidebarContent() {
       </div>
 
       {/* Analytics */}
-      <div className="px-5">
-        <div className="rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#111827] p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity size={18} className="text-cyan-600 dark:text-cyan-400" />
-
-            <span className="font-medium text-slate-900 dark:text-white">Live Analytics</span>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 dark:text-slate-400">Visitors</span>
-
-              <span className="font-semibold text-slate-900 dark:text-white">1,284</span>
-            </div>
-
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 dark:text-slate-400">Crowd Risk</span>
-
-              <span className="text-yellow-500 dark:text-yellow-400 font-semibold">Medium</span>
-            </div>
-
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 dark:text-slate-400">AI Confidence</span>
-
-              <span className="text-cyan-600 dark:text-cyan-400 font-semibold">98.6%</span>
-            </div>
-
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 dark:text-slate-400">Alerts</span>
-
-              <span className="text-red-600 dark:text-red-400 font-semibold">3 Active</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <LiveAnalytics />
 
       {/* Footer */}
       <div className="p-5 mt-4 border-t border-slate-200 dark:border-white/5 shrink-0">
         <NavLink
           to="/dashboard/settings"
           className={({ isActive }) =>
-            `w-full flex items-center gap-3 rounded-xl px-4 py-3 transition ${
+            `w-full flex items-center gap-3 rounded-xl border px-4 py-3 ${
               isActive
-                ? "border border-cyan-500/20 bg-cyan-500/10 text-slate-900 dark:text-white"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
+                ? "border-cyan-500/20 bg-cyan-500/10 text-slate-900 dark:text-white"
+                : "border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
             }`
           }
         >
@@ -224,6 +192,86 @@ function SidebarContent() {
             <span className="font-medium">Logout</span>
           </div>
         </button>
+      </div>
+    </div>
+  );
+}
+
+const RISK_LEVEL_STYLES = {
+  SAFE: "text-emerald-600 dark:text-emerald-400",
+  WARNING: "text-yellow-500 dark:text-yellow-400",
+  HIGH: "text-orange-500 dark:text-orange-400",
+  CRITICAL: "text-red-600 dark:text-red-400",
+};
+
+function riskLevelFromMetrics(metrics) {
+  let score = 0;
+  if (metrics?.density > 0.00005) score += 35;
+  if (metrics?.average_speed > 1.5) score += 20;
+  if (metrics?.surge_detected) score += 15;
+  if (metrics?.bottleneck) score += 10;
+  if (metrics?.flow_conflict) score += 10;
+
+  if (score <= 30) return "SAFE";
+  if (score <= 60) return "WARNING";
+  if (score < 80) return "HIGH";
+  return "CRITICAL";
+}
+
+function LiveAnalytics() {
+  const { data: metrics } = useLiveData(fetchCrowdMetrics, 2000);
+  const { data: zoneRows } = useLiveData(fetchZoneMetrics, 5000);
+  const { data: riskEvents } = useLiveData(() => fetchAlerts(50), 5000);
+
+  const zones = Array.isArray(zoneRows) ? zoneRows : [];
+  const liveZones = zones.filter((zone) => (zone.people_count || 0) > 0).length;
+
+  const alerts = Array.isArray(riskEvents) ? riskEvents : [];
+  const activeAlerts = alerts.filter((event) => event.risk_level !== "SAFE").length;
+
+  const visitors = metrics?.people_count ?? 0;
+  const riskLevel = riskLevelFromMetrics(metrics);
+
+  return (
+    <div className="px-5">
+      <div className="rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#111827] p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={18} className="text-cyan-600 dark:text-cyan-400" />
+
+          <span className="font-medium text-slate-900 dark:text-white">Live Analytics</span>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500 dark:text-slate-400">Visitors</span>
+
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {visitors.toLocaleString()}
+            </span>
+          </div>
+
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500 dark:text-slate-400">Crowd Risk</span>
+
+            <span className={`font-semibold ${RISK_LEVEL_STYLES[riskLevel]}`}>{riskLevel}</span>
+          </div>
+
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500 dark:text-slate-400">Zones Reporting</span>
+
+            <span className="text-cyan-600 dark:text-cyan-400 font-semibold">
+              {zones.length ? `${liveZones}/${zones.length}` : "—"}
+            </span>
+          </div>
+
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500 dark:text-slate-400">Alerts</span>
+
+            <span className="text-red-600 dark:text-red-400 font-semibold">
+              {String(activeAlerts).padStart(2, "0")} Active
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

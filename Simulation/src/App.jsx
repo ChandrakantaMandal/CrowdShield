@@ -26,11 +26,19 @@ export default function App() {
   const [runId, setRunId] = useState(import.meta.env.VITE_DEFAULT_RUN_ID || 'DEMO-STAMPEDE-001');
   const [apiUrl, setApiUrl] = useState(import.meta.env.VITE_API_URL || 'http://localhost:8000');
   const [isConnected, setIsConnected] = useState(false);
-  const [isStreamingEnabled, setIsStreamingEnabled] = useState(false);
+  const [isStreamingEnabled, setIsStreamingEnabled] = useState(
+    () => typeof localStorage !== 'undefined' && localStorage.getItem('crowdshield.streaming') === 'true'
+  );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Map-only display mode (?view=map): render the 3D digital twin without any dashboard UI
+  const isMapOnly = useMemo(
+    () => new URLSearchParams(window.location.search).get('view') === 'map',
+    []
+  );
+
   // Instantiated Crowd Engine
-  const crowdEngine = useMemo(() => new CrowdEngine(220), []);
+  const crowdEngine = useMemo(() => new CrowdEngine(Number(import.meta.env.VITE_AGENT_COUNT) || 220), []);
   const [agents, setAgents] = useState([]);
   const [zoneMetrics, setZoneMetrics] = useState({});
 
@@ -43,20 +51,49 @@ export default function App() {
         setIsStreamingEnabled(status.enabled);
       }
     });
+
+    if (!isMapOnly && localStorage.getItem('crowdshield.streaming') === 'true') {
+      telemetrySync.setStreamingEnabled(true);
+    }
     return () => unsubscribe();
-  }, [apiUrl]);
+  }, [apiUrl, isMapOnly]);
+
+  useEffect(() => {
+    if (!isMapOnly) return;
+    let cancelled = false;
+    const checkLive = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/api/crowd/metrics`, {
+          headers: { Accept: 'application/json' }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setIsConnected(Number(data?.people_count || 0) > 0);
+        }
+      } catch {
+        if (!cancelled) setIsConnected(false);
+      }
+    };
+    checkLive();
+    const timer = setInterval(checkLive, 1500);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [isMapOnly, apiUrl]);
 
   const handleToggleStreaming = () => {
     const nextState = !isStreamingEnabled;
+    localStorage.setItem('crowdshield.streaming', String(nextState));
     setIsStreamingEnabled(nextState);
     telemetrySync.setStreamingEnabled(nextState);
   };
 
-  // Main Simulation Animation & Telemetry Tick Loop
+  // Main Simulation Animation Loop (render/physics only)
   useEffect(() => {
     let animationFrameId;
     let lastTime = performance.now();
-    let telemetryTimer = 0;
 
     const tick = (now) => {
       const deltaSeconds = (now - lastTime) / 1000;
@@ -70,19 +107,6 @@ export default function App() {
 
         // Advance simulation clock
         setSimSeconds((prev) => prev + deltaSeconds * simSpeed);
-
-        // Periodically aggregate metrics and stream telemetry
-        telemetryTimer += deltaSeconds;
-        if (telemetryTimer >= 1.0) {
-          telemetryTimer = 0;
-          const currentMetrics = crowdEngine.getZoneMetrics();
-          setZoneMetrics(currentMetrics);
-
-          // Stream all zones telemetry to backend endpoint
-          Object.values(currentMetrics).forEach((zoneData) => {
-            telemetrySync.sendZoneMetrics(zoneData, runId, scenarioKey);
-          });
-        }
       }
 
       animationFrameId = requestAnimationFrame(tick);
@@ -90,22 +114,89 @@ export default function App() {
 
     animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [crowdEngine, isPaused, simSpeed, activeZone, runId, scenarioKey]);
+  }, [crowdEngine, isPaused, simSpeed]);
 
-  // Scenario change handler
-  const handleSelectScenario = (key) => {
-    setScenarioKey(key);
+  // Telemetry heartbeat - runs on its own timer so it keeps streaming even when
+  // the tab is backgrounded (browsers throttle rAF there, starving the feed).
+  useEffect(() => {
+    const sendTelemetry = () => {
+      const currentMetrics = crowdEngine.getZoneMetrics();
+      setZoneMetrics(currentMetrics);
+
+      // Stream all zones telemetry to backend endpoint
+      Object.values(currentMetrics).forEach((zoneData) => {
+        telemetrySync.sendZoneMetrics(zoneData, runId, scenarioKey);
+      });
+    };
+
+    const timer = setInterval(sendTelemetry, 1000);
+
+    // Reconnect instantly when the tab regains focus: background tabs throttle
+    // timers (intensively after ~5 min), so the next setInterval tick could be
+    // delayed by up to a minute. Fire one send immediately instead.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        sendTelemetry();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [crowdEngine, runId, scenarioKey]);
+
+  // Apply a scenario to the crowd engine and shared state
+  const applyScenario = (key) => {
     const sc = SCENARIOS[key] || SCENARIOS.normal;
-    crowdEngine.setScenario(key, sc.agentCount);
+    setScenarioKey(sc.id);
+    crowdEngine.setScenario(sc.id, sc.agentCount);
     setAgents([...crowdEngine.agents]);
+  };
+
+  // Sync scenario across app instances (full dashboard + map-only embed) via BroadcastChannel
+  const scenarioChannel = useMemo(() => {
+    if (typeof BroadcastChannel === 'undefined') return null;
+    return new BroadcastChannel('crowdshield-scenario');
+  }, []);
+
+  // Listen for scenario changes from the full dashboard (map-only mode)
+  useEffect(() => {
+    if (!scenarioChannel) return;
+    const onMessage = (event) => {
+      if (event.data?.type === 'scenario' && SCENARIOS[event.data.key]) {
+        applyScenario(event.data.key);
+      }
+    };
+    scenarioChannel.addEventListener('message', onMessage);
+    return () => scenarioChannel.removeEventListener('message', onMessage);
+  }, [scenarioChannel]);
+
+  // Map-only mode: honor an optional ?scenario= param for the initial state
+  useEffect(() => {
+    if (!isMapOnly) return;
+    const initial = new URLSearchParams(window.location.search).get('scenario');
+    if (initial && SCENARIOS[initial]) {
+      applyScenario(initial);
+    }
+  }, []);
+
+  // Scenario change handler (full dashboard)
+  const handleSelectScenario = (key) => {
+    applyScenario(key);
+    if (scenarioChannel) {
+      scenarioChannel.postMessage({ type: 'scenario', key: SCENARIOS[key] ? key : 'normal' });
+    }
   };
 
   // Reset simulation
   const handleReset = () => {
-    setScenarioKey('normal');
+    applyScenario('normal');
     setSimSeconds(0);
-    crowdEngine.setScenario('normal', 220);
-    setAgents([...crowdEngine.agents]);
+    if (scenarioChannel) {
+      scenarioChannel.postMessage({ type: 'scenario', key: 'normal' });
+    }
   };
 
   // Determine highest risk zone for emergency alert banner
@@ -127,41 +218,50 @@ export default function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 select-none">
-      {/* 1. HUD Navigation & Header */}
-      <TopHeader
-        simSeconds={simSeconds}
-        simSpeed={simSpeed}
-        onChangeSimSpeed={setSimSpeed}
-        scenarioKey={scenarioKey}
-        runId={runId}
-        isPaused={isPaused}
-        onTogglePause={() => setIsPaused(!isPaused)}
-        isConnected={isConnected}
-        isStreamingEnabled={isStreamingEnabled}
-        onToggleStreaming={handleToggleStreaming}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
+      {/* 1. HUD Navigation & Header (hidden in map-only mode) */}
+      {!isMapOnly && (
+        <TopHeader
+          simSeconds={simSeconds}
+          simSpeed={simSpeed}
+          onChangeSimSpeed={setSimSpeed}
+          scenarioKey={scenarioKey}
+          runId={runId}
+          isPaused={isPaused}
+          onTogglePause={() => setIsPaused(!isPaused)}
+          isConnected={isConnected}
+          isStreamingEnabled={isStreamingEnabled}
+          onToggleStreaming={handleToggleStreaming}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+        />
+      )}
 
-      {/* 2. Interactive Controls & Telemetry Overlay */}
-      <ControlPanel
-        activeScenario={scenarioKey}
-        onSelectScenario={handleSelectScenario}
-        onReset={handleReset}
-      />
+      {/* 2. Interactive Controls & Telemetry Overlay (hidden in map-only mode) */}
+      {!isMapOnly && (
+        <ControlPanel
+          activeScenario={scenarioKey}
+          onSelectScenario={handleSelectScenario}
+          onReset={handleReset}
+        />
+      )}
 
-      <TelemetryPanel
-        zoneMetrics={zoneMetrics}
-        activeZone={activeZone}
-        onSelectZone={setActiveZone}
-      />
+      {!isMapOnly && (
+        <TelemetryPanel
+          zoneMetrics={zoneMetrics}
+          activeZone={activeZone}
+          onSelectZone={setActiveZone}
+        />
+      )}
 
-      <AlertBanner
-        activeScenario={scenarioKey}
-        highestRiskZone={highestRiskZone}
-        isStampede={scenarioKey === 'stampede'}
-      />
+      {!isMapOnly && (
+        <AlertBanner
+          activeScenario={scenarioKey}
+          highestRiskZone={highestRiskZone}
+          isStampede={scenarioKey === 'stampede'}
+        />
+      )}
 
-      {/* 3. Three.js 3D Digital Twin Canvas */}
+      {/* 3. Three.js 3D Digital Twin Canvas (fills viewport) */}
+      <div className={isMapOnly ? 'absolute inset-0 w-full h-full' : 'relative w-full h-full'}>
       <Canvas shadows gl={{ antialias: true }}>
         <PerspectiveCamera makeDefault position={[0, 45, 55]} fov={50} />
         <OrbitControls
@@ -191,27 +291,37 @@ export default function App() {
 
         {/* 3D Scene Components */}
         <Venue3D activeZone={activeZone} zoneRiskData={zoneMetrics} />
-        <CrowdAgents agents={agents} scenario={scenarioKey} />
-        <EmergencyPath3D
-          activeScenario={scenarioKey}
-          isCritical={highestRiskZone?.risk?.level === 'CRITICAL'}
+        <CrowdAgents
+          agents={isMapOnly && !isConnected ? [] : agents}
+          scenario={scenarioKey}
         />
-        <ZoneLabels3D
-          zoneMetrics={zoneMetrics}
-          activeZone={activeZone}
-          onSelectZone={setActiveZone}
-        />
+        {!isMapOnly && (
+          <>
+            <EmergencyPath3D
+              activeScenario={scenarioKey}
+              isCritical={highestRiskZone?.risk?.level === 'CRITICAL'}
+            />
+            <ZoneLabels3D
+              zoneMetrics={zoneMetrics}
+              activeZone={activeZone}
+              onSelectZone={setActiveZone}
+            />
+          </>
+        )}
       </Canvas>
+      </div>
 
-      {/* 4. Configuration Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        apiUrl={apiUrl}
-        onSaveApiUrl={setApiUrl}
-        runId={runId}
-        onSaveRunId={setRunId}
-      />
+      {/* 4. Configuration Settings Modal (hidden in map-only mode) */}
+      {!isMapOnly && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          apiUrl={apiUrl}
+          onSaveApiUrl={setApiUrl}
+          runId={runId}
+          onSaveRunId={setRunId}
+        />
+      )}
     </div>
   );
 }

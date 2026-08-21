@@ -11,8 +11,26 @@ export class TelemetrySync {
     this.isStreamingEnabled = false; // Off by default to prevent ERR_CONNECTION_REFUSED console spam
     this.lastResponse = null;
     this.lastAttemptTime = 0;
-    this.backoffMs = 15000; // Retry after 15 seconds if server is offline
+    this.backoffMs = Number(import.meta.env.VITE_TELEMETRY_BACKOFF_MS) || 15000; // Retry after 15 seconds if server is offline
     this.subscribers = new Set();
+    this.lastVisibilityTransition = 0;
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+  }
+
+  handleVisibilityChange = () => {
+    this.lastVisibilityTransition = Date.now();
+    if (document.visibilityState === 'visible' && this.isStreamingEnabled) {
+      this.lastAttemptTime = 0;
+    }
+  };
+
+  destroy() {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    }
   }
 
   setApiUrl(url) {
@@ -22,7 +40,11 @@ export class TelemetrySync {
   setStreamingEnabled(enabled) {
     this.isStreamingEnabled = enabled;
     if (enabled) {
-      this.lastAttemptTime = 0; // force immediate check
+      // Manual reconnect: allow an immediate attempt
+      this.lastAttemptTime = 0;
+    } else {
+      // Manual disconnect: stop the stream and clear the live connection state
+      this.isConnected = false;
     }
     this.notify({ connected: this.isConnected, enabled: this.isStreamingEnabled });
   }
@@ -40,6 +62,10 @@ export class TelemetrySync {
     // If streaming is disabled by user, run silently in standalone mode
     if (!this.isStreamingEnabled) {
       return { success: false, standalone: true };
+    }
+
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return { success: false, suppressed: true };
     }
 
     // If server was previously offline, respect backoff timer before retrying
@@ -77,14 +103,24 @@ export class TelemetrySync {
 
       if (response.ok) {
         const data = await response.json();
+        // Manual disconnect while this request was in flight: do not re-mark as connected
+        if (!this.isStreamingEnabled) {
+          return { success: false, standalone: true };
+        }
         this.isConnected = true;
         this.lastResponse = data;
-        this.notify({ connected: true, enabled: true, lastSent: payload, response: data });
+        this.notify({ connected: true, enabled: this.isStreamingEnabled, lastSent: payload, response: data });
         return { success: true, data };
       } else {
         throw new Error(`HTTP Error ${response.status}`);
       }
     } catch (err) {
+      const hidden =
+        typeof document !== 'undefined' && document.visibilityState === 'hidden';
+      const justSwitched = Date.now() - this.lastVisibilityTransition < 1500;
+      if (hidden || justSwitched) {
+        return { success: false, suppressed: true, error: err.message };
+      }
       this.isConnected = false;
       this.notify({ connected: false, enabled: this.isStreamingEnabled, error: err.message });
       return { success: false, error: err.message, standalone: true };

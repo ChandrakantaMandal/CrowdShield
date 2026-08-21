@@ -7,10 +7,24 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
-    shouldPlaySound: false,
+    shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
+
+const ALERTS_CHANNEL_ID = "alerts";
+
+async function ensureAlertsChannel() {
+  if (Platform.OS !== "android") {
+    return;
+  }
+  await Notifications.setNotificationChannelAsync(ALERTS_CHANNEL_ID, {
+    name: "Alerts",
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: "alert.mp3",
+    vibrationPattern: [0, 250, 250, 250],
+  });
+}
 
 export async function registerForPushNotificationsAsync() {
   if (!Device.isDevice) {
@@ -41,6 +55,7 @@ export async function registerForPushNotificationsAsync() {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
     });
+    await ensureAlertsChannel();
   }
 
   const projectId =
@@ -64,12 +79,19 @@ export async function registerForPushNotificationsAsync() {
 
 export async function showForegroundAlert(title: string, body: string) {
   try {
+    await ensureAlertsChannel();
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
         body,
+        sound: "alert.mp3",
       },
-      trigger: null,
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 1,
+        channelId: ALERTS_CHANNEL_ID,
+      },
     });
   } catch (err) {
     console.log("Failed to show notification:", err);

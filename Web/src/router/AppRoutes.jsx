@@ -2,8 +2,13 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 
 import ProtectedRoute from "./ProtectedRoute";
+import ErrorBoundary from "./ErrorBoundary";
 
 const Login = lazy(() => import("../features/auth/pages/Login"));
+
+const ResetPassword = lazy(
+  () => import("../features/auth/pages/ResetPassword"),
+);
 
 const DashboardLayout = lazy(
   () => import("../features/admin/layout/DashboardLayout"),
@@ -20,7 +25,8 @@ const Settings = lazy(() => import("../features/admin/pages/Settings"));
 export default function AppRoutes() {
   return (
     <BrowserRouter>
-      <Suspense
+      <ErrorBoundary>
+        <Suspense
         fallback={
           <div className="h-screen flex items-center justify-center bg-slate-100 dark:bg-[#0B1220] text-slate-900 dark:text-white">
             Loading...
@@ -29,6 +35,7 @@ export default function AppRoutes() {
       >
         <Routes>
           <Route path="/" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           <Route
   path="/dashboard"
@@ -47,7 +54,8 @@ export default function AppRoutes() {
   <Route path="settings" element={<Settings />} />
 </Route>
         </Routes>
-      </Suspense>
+        </Suspense>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

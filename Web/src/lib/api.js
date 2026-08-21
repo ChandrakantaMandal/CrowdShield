@@ -19,6 +19,11 @@ export async function fetchRiskEvents(limit = 50) {
   return Array.isArray(data) ? data : data?.data || [];
 }
 
+export async function fetchAlerts(limit = 50) {
+  const data = await request(`/api/db/alerts?limit=${limit}`);
+  return Array.isArray(data) ? data : data?.data || [];
+}
+
 export async function fetchCrowdHistory(limit = 50, zoneId) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (zoneId) params.set("zone_id", zoneId);
@@ -27,6 +32,14 @@ export async function fetchCrowdHistory(limit = 50, zoneId) {
 }
 
 export async function fetchZoneMetrics() {
+  try {
+    const liveData = await request("/api/crowd/zones/live");
+    if (Array.isArray(liveData) && liveData.length > 0) {
+      return liveData;
+    }
+  } catch (e) {
+    // Fall back to database endpoint if live stream in-memory route is offline
+  }
   const data = await request("/api/crowd/zones");
   return Array.isArray(data) ? data : data?.data || [];
 }
@@ -36,6 +49,14 @@ export function riskLevelFromScore(score) {
   if (score <= 60) return "WARNING";
   if (score <= 80) return "HIGH";
   return "CRITICAL";
+}
+
+export async function fetchSafeGate(gateId = "GATE_A") {
+  try {
+    return await request(`/api/safe-gate/${gateId}`);
+  } catch (e) {
+    return null;
+  }
 }
 
 export function formatTime(isoString) {

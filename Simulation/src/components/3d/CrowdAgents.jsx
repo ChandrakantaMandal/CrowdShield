@@ -9,10 +9,13 @@ export function CrowdAgents({ agents = [], scenario = 'normal' }) {
   const meshRef = useRef();
 
   useFrame(() => {
-    if (!meshRef.current || !agents.length) return;
+    if (!meshRef.current) return;
 
     // Explicitly update active instance count to prevent ghost agents when switching scenarios
+    // or when the stream is disconnected (empty agents) - set count to 0 so none render.
     meshRef.current.count = agents.length;
+
+    if (!agents.length) return;
 
     agents.forEach((agent, i) => {
       const [x, y, z] = agent.pos;

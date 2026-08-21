@@ -4,20 +4,47 @@ import {
   Mail,
   Lock,
   ArrowRight,
+  ArrowLeft,
   Loader2,
   Eye,
   EyeOff,
 } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import useLogin from "../hooks/useLogin";
+import { supabase } from "../../../lib/supabase";
 
 export default function Login() {
-  const { login, loading } = useLogin();
+  const { login, loading, error } = useLogin();
+  const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [mode, setMode] = useState("login");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgetError] = useState(null);
+
+  const sendResetCode = async (e) => {
+    e.preventDefault();
+    try {
+      setForgotLoading(true);
+      setForgetError(null);
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: forgotEmail,
+      });
+
+      if (error) throw error;
+
+      navigate("/reset-password", { state: { email: forgotEmail } });
+    } catch (err) {
+      setForgetError(err.message);
+      setForgotLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 relative overflow-hidden bg-slate-100 dark:bg-[#0B1220]">
@@ -52,7 +79,6 @@ export default function Login() {
         {/* Title */}
         <h1 className="text-center text-4xl font-extrabold mt-7 tracking-tight text-slate-900 dark:text-white">
           Crowd
-
           <span
             className="bg-clip-text text-transparent ml-1"
             style={{
@@ -67,95 +93,191 @@ export default function Login() {
           AI Powered Crowd Monitoring & Analytics Platform
         </p>
 
-        {/* Email */}
-        <div className="mt-8">
-          <label className="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
-            Email Address
-          </label>
+        {mode === "forgot" ? (
+          <form onSubmit={sendResetCode}>
+            <p className="mt-6 text-sm text-slate-500 dark:text-slate-400 text-center">
+              Enter your account email and we'll send you a one-time
+              verification code.
+            </p>
 
-          <div className="flex items-center rounded-2xl px-4 py-3 border transition-all duration-300 focus-within:ring-2 focus-within:ring-cyan-400/30 border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-[#151F30]">
-            <Mail size={20} className="mr-3 text-cyan-600 dark:text-cyan-400" />
+            <div className="mt-6">
+              <label className="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
+                Email Address
+              </label>
 
-            <input
-              type="email"
-              placeholder="admin@crowdguardian.ai"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-transparent outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900 dark:text-white"
-            />
-          </div>
-        </div>
+              <div className="flex items-center rounded-2xl px-4 py-3 border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-[#151F30]">
+                <Mail
+                  size={20}
+                  className="mr-3 text-cyan-600 dark:text-cyan-400"
+                />
 
-        {/* Password */}
-        <div className="mt-5">
-          <label className="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
-            Password
-          </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="admin@crowdshield.ai"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="w-full bg-transparent outline-none text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
 
-          <div className="flex items-center rounded-2xl px-4 py-3 border transition-all duration-300 border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-[#151F30]">
-            <Lock size={20} className="mr-3 text-cyan-600 dark:text-cyan-400" />
+            <motion.button
+              type="submit"
+              disabled={forgotLoading}
+              whileHover={{
+                scale: 1.02,
+                boxShadow: "0 0 30px rgba(34,211,238,.25)",
+              }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full mt-8 rounded-2xl py-4 font-semibold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+              style={{
+                background: "linear-gradient(90deg,#22D3EE,#3B82F6)",
+              }}
+            >
+              {forgotLoading ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  Send Code
+                  <ArrowRight size={20} />
+                </>
+              )}
+            </motion.button>
 
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-transparent outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900 dark:text-white"
-            />
+            {forgotError && (
+              <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-600 dark:text-red-400 text-center">
+                {forgotError}
+              </div>
+            )}
 
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="transition text-slate-500 dark:text-slate-400"
+              onClick={() => {
+                setMode("login");
+                setForgetError(null);
+              }}
+              className="mt-6 w-full flex items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
             >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              <ArrowLeft size={16} />
+              Back to Login
             </button>
-          </div>
-        </div>
-
-        {/* Remember */}
-        <div className="flex justify-between items-center mt-5 text-sm text-slate-500 dark:text-slate-400">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="accent-cyan-500" />
-            Remember me
-          </label>
-
-          <button
-            type="button"
-            className="transition hover:opacity-80 text-cyan-600 dark:text-cyan-400"
+          </form>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              login(email, password);
+            }}
           >
-            Forgot Password?
-          </button>
-        </div>
+            {/* Email */}
+            <div className="mt-8">
+              <label className="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
+                Email Address
+              </label>
 
-        {/* Login Button */}
-        <motion.button
-          whileHover={{
-            scale: 1.02,
-            boxShadow: "0 0 30px rgba(34,211,238,.25)",
-          }}
-          whileTap={{
-            scale: 0.98,
-          }}
-          disabled={loading}
-          onClick={() => login(email, password)}
-          className="w-full mt-8 rounded-2xl py-4 font-semibold text-white flex items-center justify-center gap-2 transition-all"
-          style={{
-            background: "linear-gradient(90deg,#22D3EE,#3B82F6)",
-          }}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="animate-spin" size={20} />
-              Signing In...
-            </>
-          ) : (
-            <>
-              Login
-              <ArrowRight size={20} />
-            </>
-          )}
-        </motion.button>
+              <div className="flex items-center rounded-2xl px-4 py-3 border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-[#151F30]">
+                <Mail
+                  size={20}
+                  className="mr-3 text-cyan-600 dark:text-cyan-400"
+                />
+
+                <input
+                  type="email"
+                  required
+                  placeholder="admin@crowdshield.ai"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-transparent outline-none text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="mt-5">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-slate-900 dark:text-white">
+                  Password
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotEmail(email || "");
+                    setMode("forgot");
+                    setForgetError(null);
+                  }}
+                  className="text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+
+              <div className="flex items-center rounded-2xl px-4 py-3 border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-[#151F30]">
+                <Lock
+                  size={20}
+                  className="mr-3 text-cyan-600 dark:text-cyan-400"
+                />
+
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-transparent outline-none text-slate-900 dark:text-white"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="text-slate-500 dark:text-slate-400"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Login Button */}
+            <motion.button
+              type="submit"
+              disabled={loading}
+              whileHover={{
+                scale: 1.02,
+                boxShadow: "0 0 30px rgba(34,211,238,.25)",
+              }}
+              whileTap={{
+                scale: 0.98,
+              }}
+              className="w-full mt-8 rounded-2xl py-4 font-semibold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+              style={{
+                background: "linear-gradient(90deg,#22D3EE,#3B82F6)",
+              }}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Signing In...
+                </>
+              ) : (
+                <>
+                  Login
+                  <ArrowRight size={20} />
+                </>
+              )}
+            </motion.button>
+          </form>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-600 dark:text-red-400 text-center">
+            {error}
+          </div>
+        )}
 
         {/* Divider */}
         <div className="flex items-center my-8">
