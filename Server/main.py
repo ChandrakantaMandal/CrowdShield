@@ -11,6 +11,7 @@ from routers.alerts import router as alerts_router
 from routers.safe_gate import router as safe_gate_router
 from routers.gate import router as gate_router
 from routers.db import router as db_router
+import os
 
 
 from shared_data import latest_metrics, last_risk_level, touch_zone, prune_stale_metrics
@@ -45,9 +46,11 @@ app.include_router(safe_gate_router)
 app.include_router(gate_router)
 app.include_router(db_router)
 
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
