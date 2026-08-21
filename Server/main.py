@@ -50,10 +50,11 @@ frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 simulation_url = os.getenv("SIMULATION_URL", "http://localhost:3000")
 
 allowed_origins = [
-    url.strip()
+    url.strip().rstrip("/")
     for url in [frontend_url, simulation_url]
     if url.strip()
 ]
+allowed_origins += ["http://localhost:5173", "http://localhost:3000"]
 
 app.add_middleware(
     CORSMiddleware,
