@@ -226,12 +226,12 @@ export default function HeatmapCanvas({
     // 3. Render Zone Radial Heatmap Overlay
     Object.values(ZONES).forEach((zone) => {
       const metric = zoneMetricsMap[zone.id] || {};
-      const people = metric.people_count ?? Math.floor(zone.capacity * 0.4);
+      const people = metric.people_count ?? 0;
       const density = metric.density ?? (people / (zone.size[0] * zone.size[1]));
-      const capacityRatio = people / zone.capacity;
+      const capacityRatio = zone.capacity ? people / zone.capacity : 0;
 
-      // Filter by min density threshold if set
-      if (density < minDensityThreshold) return;
+      // Filter out zones with 0 people/density or below min density threshold
+      if (people <= 0 || density <= 0 || density < minDensityThreshold) return;
 
       const [cx, , cz] = zone.center;
       const { px, py } = worldToCanvas(cx, cz, width, height, pan, zoom);
@@ -397,8 +397,9 @@ export default function HeatmapCanvas({
         if (!zone) return;
 
         const metric = zoneMetricsMap[p.zoneId] || {};
-        const people = metric.people_count ?? Math.floor(zone.capacity * 0.4);
-        const capacityRatio = people / zone.capacity;
+        const people = metric.people_count ?? 0;
+        if (people <= 0) return;
+        const capacityRatio = zone.capacity ? people / zone.capacity : 0;
 
         // Speed up particles in dense / surge zones
         const speedMult = capacityRatio > 0.8 ? 2.2 : 1.0;
