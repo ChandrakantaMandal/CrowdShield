@@ -5,11 +5,21 @@
   },
   "build": {
     "development": {
-      "developmentClient": true,
       "distribution": "internal"
     },
     "preview": {
       "distribution": "internal"
+    },
+    "apk": {
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "$EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "$EXPO_PUBLIC_SUPABASE_ANON_KEY"
+      }
     },
     "production": {
       "autoIncrement": true
