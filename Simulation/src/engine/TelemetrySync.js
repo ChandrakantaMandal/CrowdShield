@@ -5,7 +5,10 @@
  */
 
 export class TelemetrySync {
-  constructor(apiUrl = 'http://localhost:8000') {
+  constructor(apiUrl) {
+    if (!apiUrl) {
+      console.warn('[TelemetrySync] No apiUrl provided – pass VITE_API_URL via env');
+    }
     this.apiUrl = apiUrl;
     this.isConnected = false;
     this.isStreamingEnabled = false; // Off by default to prevent ERR_CONNECTION_REFUSED console spam

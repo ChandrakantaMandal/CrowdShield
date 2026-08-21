@@ -46,13 +46,14 @@ app.include_router(safe_gate_router)
 app.include_router(gate_router)
 app.include_router(db_router)
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_URLS = os.getenv("FRONTEND_URL", "*")
+allowed_origins = [o.strip() for o in FRONTEND_URLS.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_origins=allowed_origins if allowed_origins != ["*"] else ["*"],
+    allow_credentials=allowed_origins != ["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
