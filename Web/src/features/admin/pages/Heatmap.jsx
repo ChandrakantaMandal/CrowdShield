@@ -70,6 +70,20 @@ function generateFallbackZoneData() {
   return mockData;
 }
 
+const ZONE_ALIAS_MAP = {
+  ZONE_1: "ZONE_C",
+  ZONE_2: "ZONE_A",
+  ZONE_3: "ZONE_B",
+  ZONE_4: "ZONE_D",
+  ZONE_5: "ZONE_E",
+  CAM_01: "ZONE_C",
+  CAM_A: "ZONE_A",
+  CAM_B: "ZONE_B",
+  CAM_C: "ZONE_C",
+  CAM_D: "ZONE_D",
+  CAM_E: "ZONE_E",
+};
+
 export default function Heatmap() {
   const [activeZoneId, setActiveZoneId] = useState(null);
   const [showParticles, setShowParticles] = useState(true);
@@ -132,10 +146,15 @@ export default function Heatmap() {
     }
 
     if (hasLiveData) {
-      // Direct 1-to-1 mapping from Database / Simulation Telemetry
+      // Direct mapping from Database / AI Telemetry with zone alias fallback
       rawZoneData.forEach((row) => {
-        if (row.zone_id && map[row.zone_id]) {
-          const zone = ZONES[row.zone_id];
+        const rawId = row.zone_id || row.camera_id;
+        const targetZoneId = ZONES[rawId]
+          ? rawId
+          : ZONE_ALIAS_MAP[row.zone_id] || ZONE_ALIAS_MAP[row.camera_id] || "ZONE_C";
+
+        if (map[targetZoneId]) {
+          const zone = ZONES[targetZoneId];
           const people = row.people_count ?? 0;
           const capacity = zone?.capacity || 100;
           const ratio = people / capacity;
@@ -145,13 +164,14 @@ export default function Heatmap() {
             risk = ratio > 0.85 ? "CRITICAL" : ratio > 0.65 ? "HIGH" : ratio > 0.4 ? "WARNING" : "SAFE";
           }
 
-          map[row.zone_id] = {
-            ...map[row.zone_id],
+          map[targetZoneId] = {
+            ...map[targetZoneId],
             ...row,
-            people_count: people,
-            density: row.density ?? Number((people / (zone?.size[0] * zone?.size[1] || 1)).toFixed(2)),
-            surge_detected: Boolean(row.surge_detected || (simulatedSurge && row.zone_id === "ZONE_C")),
-            risk_level: simulatedSurge && row.zone_id === "ZONE_C" ? "CRITICAL" : risk,
+            zone_id: targetZoneId,
+            people_count: (map[targetZoneId].people_count || 0) + people,
+            density: Math.max(map[targetZoneId].density || 0, row.density ?? Number((people / (zone?.size[0] * zone?.size[1] || 1)).toFixed(2))),
+            surge_detected: Boolean(map[targetZoneId].surge_detected || row.surge_detected || (simulatedSurge && targetZoneId === "ZONE_C")),
+            risk_level: simulatedSurge && targetZoneId === "ZONE_C" ? "CRITICAL" : (risk === "CRITICAL" ? "CRITICAL" : risk),
           };
         }
       });
