@@ -9,7 +9,7 @@ export class TelemetrySync {
     if (!apiUrl) {
       console.warn('[TelemetrySync] No apiUrl provided – pass VITE_API_URL via env');
     }
-    this.apiUrl = apiUrl;
+    this.apiUrl = (apiUrl || '').replace(/\/+$/, '');
     this.isConnected = false;
     this.isStreamingEnabled = false; // Off by default to prevent ERR_CONNECTION_REFUSED console spam
     this.lastResponse = null;
@@ -37,7 +37,7 @@ export class TelemetrySync {
   }
 
   setApiUrl(url) {
-    this.apiUrl = url;
+    this.apiUrl = (url || '').replace(/\/+$/, '');
   }
 
   setStreamingEnabled(enabled) {
