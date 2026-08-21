@@ -120,6 +120,7 @@ while True:
 
         data = {
             "camera_id": "CAM_01",
+            "zone_id": "ZONE_C",
             "people_count": int(people_count),
             "density": float(density),
             "average_speed": float(average_speed),

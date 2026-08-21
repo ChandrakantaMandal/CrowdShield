@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import HeatmapCanvas from "../components/HeatmapCanvas";
 import useLiveData from "../../../lib/useLiveData";
-import { fetchZoneMetrics, riskLevelFromScore } from "../../../lib/api";
+import { fetchZoneMetrics, fetchCrowdMetrics, riskLevelFromScore } from "../../../lib/api";
 import { ZONES } from "../../../Map/data/venueConfig";
 
 // Default simulation zone data generator if backend endpoint is offline
@@ -70,6 +70,20 @@ function generateFallbackZoneData() {
   return mockData;
 }
 
+const ZONE_ALIAS_MAP = {
+  ZONE_1: "ZONE_C",
+  ZONE_2: "ZONE_A",
+  ZONE_3: "ZONE_B",
+  ZONE_4: "ZONE_D",
+  ZONE_5: "ZONE_E",
+  CAM_01: "ZONE_C",
+  CAM_A: "ZONE_A",
+  CAM_B: "ZONE_B",
+  CAM_C: "ZONE_C",
+  CAM_D: "ZONE_D",
+  CAM_E: "ZONE_E",
+};
+
 export default function Heatmap() {
   const [activeZoneId, setActiveZoneId] = useState(null);
   const [showParticles, setShowParticles] = useState(true);
@@ -78,9 +92,13 @@ export default function Heatmap() {
   const [minDensityThreshold, setMinDensityThreshold] = useState(0);
   const [simulatedSurge, setSimulatedSurge] = useState(false);
 
-  // Fetch live zone data from database & backend stream (polling every 1.5 seconds)
+  // Fetch live zone data & dashboard crowd metrics (polling every 1.5 seconds)
   const { data: rawZoneData, loading, error } = useLiveData(
     fetchZoneMetrics,
+    1500
+  );
+  const { data: crowdMetrics } = useLiveData(
+    fetchCrowdMetrics,
     1500
   );
 
@@ -107,12 +125,36 @@ export default function Heatmap() {
     });
 
     const hasLiveData = Array.isArray(rawZoneData) && rawZoneData.length > 0;
+    const dashboardPeople = crowdMetrics?.people_count;
+
+    const liveZoneTotalPeople = hasLiveData
+      ? rawZoneData.reduce((acc, row) => acc + (row.people_count || 0), 0)
+      : 0;
+
+    // When dashboard total people is zero, or live zone total is zero, or no active telemetry:
+    const isTotalZero =
+      dashboardPeople === 0 ||
+      (hasLiveData && liveZoneTotalPeople === 0) ||
+      (!hasLiveData && (dashboardPeople === undefined || dashboardPeople === 0));
+
+    if (isTotalZero) {
+      if (simulatedSurge) {
+        map["ZONE_C"].surge_detected = true;
+        map["ZONE_C"].risk_level = "CRITICAL";
+      }
+      return map;
+    }
 
     if (hasLiveData) {
-      // Direct 1-to-1 mapping from Database / Simulation Telemetry
+      // Direct mapping from Database / AI Telemetry with zone alias fallback
       rawZoneData.forEach((row) => {
-        if (row.zone_id && map[row.zone_id]) {
-          const zone = ZONES[row.zone_id];
+        const rawId = row.zone_id || row.camera_id;
+        const targetZoneId = ZONES[rawId]
+          ? rawId
+          : ZONE_ALIAS_MAP[row.zone_id] || ZONE_ALIAS_MAP[row.camera_id] || "ZONE_C";
+
+        if (map[targetZoneId]) {
+          const zone = ZONES[targetZoneId];
           const people = row.people_count ?? 0;
           const capacity = zone?.capacity || 100;
           const ratio = people / capacity;
@@ -122,18 +164,19 @@ export default function Heatmap() {
             risk = ratio > 0.85 ? "CRITICAL" : ratio > 0.65 ? "HIGH" : ratio > 0.4 ? "WARNING" : "SAFE";
           }
 
-          map[row.zone_id] = {
-            ...map[row.zone_id],
+          map[targetZoneId] = {
+            ...map[targetZoneId],
             ...row,
-            people_count: people,
-            density: row.density ?? Number((people / (zone?.size[0] * zone?.size[1] || 1)).toFixed(2)),
-            surge_detected: Boolean(row.surge_detected || (simulatedSurge && row.zone_id === "ZONE_C")),
-            risk_level: simulatedSurge && row.zone_id === "ZONE_C" ? "CRITICAL" : risk,
+            zone_id: targetZoneId,
+            people_count: (map[targetZoneId].people_count || 0) + people,
+            density: Math.max(map[targetZoneId].density || 0, row.density ?? Number((people / (zone?.size[0] * zone?.size[1] || 1)).toFixed(2))),
+            surge_detected: Boolean(map[targetZoneId].surge_detected || row.surge_detected || (simulatedSurge && targetZoneId === "ZONE_C")),
+            risk_level: simulatedSurge && targetZoneId === "ZONE_C" ? "CRITICAL" : (risk === "CRITICAL" ? "CRITICAL" : risk),
           };
         }
       });
-    } else {
-      // Use fallback baseline data if backend server is offline
+    } else if (dashboardPeople > 0) {
+      // Use fallback baseline data only if dashboard people is explicitly > 0
       Object.keys(fallbackData).forEach((zId) => {
         map[zId] = {
           ...fallbackData[zId],
@@ -144,7 +187,7 @@ export default function Heatmap() {
     }
 
     return map;
-  }, [rawZoneData, fallbackData, simulatedSurge]);
+  }, [rawZoneData, crowdMetrics, fallbackData, simulatedSurge]);
 
   // Aggregate Key Metrics
   const aggregatedStats = useMemo(() => {
@@ -170,7 +213,7 @@ export default function Heatmap() {
         criticalCount++;
       }
 
-      if (density > maxDensity) {
+      if (people > 0 && density > maxDensity) {
         maxDensity = density;
         highestDensityZone = {
           ...z,
@@ -181,6 +224,10 @@ export default function Heatmap() {
         };
       }
     });
+
+    if (totalPeople === 0) {
+      highestDensityZone = null;
+    }
 
     return {
       totalPeople,

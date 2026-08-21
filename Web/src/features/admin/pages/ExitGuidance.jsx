@@ -74,7 +74,7 @@ export default function ExitGuidance() {
   const zoneMetricsMap = useMemo(() => {
     const map = {};
     Object.values(ZONES).forEach((z) => {
-      map[z.id] = { people_count: Math.round(z.capacity * 0.4), density: 1.2 };
+      map[z.id] = { people_count: 0, density: 0 };
     });
 
     if (Array.isArray(rawZoneData) && rawZoneData.length > 0) {
